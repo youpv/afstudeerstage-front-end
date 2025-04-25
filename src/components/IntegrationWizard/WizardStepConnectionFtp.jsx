@@ -166,11 +166,6 @@ function WizardStepConnectionFtp({
                 Data Preview
               </Text>
 
-              {/* Show spinner only while actively fetching/processing */}
-              {isConnectionStepLoading && (
-                <Spinner accessibilityLabel="Loading preview" size="small" />
-              )}
-
               {/* Show data path processing error specifically */}
               {dataPathError && !isConnectionStepLoading && (
                 <Banner status="warning">{dataPathError}</Banner>
