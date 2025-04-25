@@ -10,13 +10,10 @@ import {
   ActionList,
   Tooltip,
   InlineGrid,
-  Badge,
-  Scrollable,
   Box,
   Icon,
   Card,
   TextField,
-  Spinner,
   InlineError,
 } from '@shopify/polaris'
 import {
@@ -51,8 +48,20 @@ const METAFIELD_TYPES = [
   { label: 'URL', value: 'url' },
   { label: 'Date', value: 'date' },
   { label: 'Date & Time', value: 'date_time' },
+  { label: 'Color', value: 'color' },
+  { label: 'Weight', value: 'weight' },
+  { label: 'Volume', value: 'volume' },
+  { label: 'Dimension', value: 'dimension' },
+  { label: 'Rating', value: 'rating' },
   { label: 'List: Single line text', value: 'list.single_line_text_field' },
-  // Add more list types if needed (e.g., list.number_integer)
+  { label: 'List: Multi line text', value: 'list.multi_line_text_field' },
+  { label: 'List: Integer', value: 'list.number_integer' },
+  { label: 'List: Decimal', value: 'list.number_decimal' },
+  { label: 'List: Boolean', value: 'list.boolean' },
+  { label: 'List: URL', value: 'list.url' },
+  { label: 'List: Date', value: 'list.date' },
+  { label: 'List: Date & Time', value: 'list.date_time' },
+  { label: 'List: JSON String', value: 'list.json_string' },
 ];
 
 // --- Helper to get keys from the first object in an array ---
