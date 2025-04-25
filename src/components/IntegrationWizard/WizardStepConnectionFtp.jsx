@@ -7,6 +7,8 @@ import {
   Banner,
   Spinner,
   Box,
+  InlineStack,
+  Badge,
 } from '@shopify/polaris'
 
 /**
@@ -36,13 +38,18 @@ function WizardStepConnectionFtp({
   handleTestConnectionClick,
   testConnectionMutation,
   downloadMutation,
-  processedPreviewData,
   truncatedPreviewString,
   dataPathError,
   remoteData,
+  productCount,
 }) {
   const isConnectionStepLoading =
     testConnectionMutation.isPending || downloadMutation.isPending
+
+  // Determine if the preview string contains actual data (not the placeholder/error messages)
+  const hasPreviewData = truncatedPreviewString && 
+                         !truncatedPreviewString.startsWith('{ info:') && 
+                         !truncatedPreviewString.startsWith('{ error:');
 
   return (
     <BlockStack gap="400" inlineAlign="start">
@@ -162,19 +169,22 @@ function WizardStepConnectionFtp({
 
             {/* Data Preview Section */}
             <BlockStack gap="200">
-              <Text variant="headingSm" as="h3">
-                Data Preview
-              </Text>
+              <InlineStack align="space-between" blockAlign="center">
+                <Text variant="headingSm" as="h3">
+                  Data Preview
+                </Text>
+                {productCount && productCount > 1 && (
+                  <Badge tone="info">{productCount} products found</Badge>
+                )}
+              </InlineStack>
 
               {/* Show data path processing error specifically */}
               {dataPathError && !isConnectionStepLoading && (
                 <Banner status="warning">{dataPathError}</Banner>
               )}
 
-              {/* Show the preview content only if not loading AND we have processed data */}
-              {!isConnectionStepLoading &&
-                processedPreviewData !== null &&
-                !dataPathError && (
+              {/* Show the preview content only if not loading AND we have actual preview data */}
+              {!isConnectionStepLoading && hasPreviewData && !dataPathError && (
                   <Box
                     background="bg-surface-secondary"
                     padding="400"
@@ -206,8 +216,7 @@ function WizardStepConnectionFtp({
                   </Box>
                 )}
               {/* Message when connection is fine but no preview is ready yet */}
-              {!isConnectionStepLoading &&
-                processedPreviewData === null &&
+              {!isConnectionStepLoading && !hasPreviewData &&
                 !testConnectionMutation.isError &&
                 !downloadMutation.isError &&
                 !dataPathError && (

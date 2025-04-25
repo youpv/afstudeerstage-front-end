@@ -46,7 +46,7 @@ export const suggestMappings = async (dataSample, systemPrompt) => {
       throw new Error("Data sample is too large for AI processing. Try with a smaller sample.");
   }
 
-  console.log("Sending data sample to OpenAI for mapping:", dataSampleString); // Log for debugging
+  
 
   try {
     const completion = await openai.chat.completions.create({
@@ -65,7 +65,7 @@ export const suggestMappings = async (dataSample, systemPrompt) => {
       temperature: 0.2, // Lower temperature for more deterministic results
     });
 
-    console.log("OpenAI Response:", completion); // Log for debugging
+    
 
     const responseContent = completion.choices[0]?.message?.content;
     if (!responseContent) {
@@ -74,7 +74,7 @@ export const suggestMappings = async (dataSample, systemPrompt) => {
 
     // Parse the JSON response from the AI
     const suggestedMapping = JSON.parse(responseContent);
-    console.log("Parsed Suggested Mapping:", suggestedMapping); // Log for debugging
+    
     return suggestedMapping;
 
   } catch (error) {
