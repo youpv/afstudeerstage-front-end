@@ -1,0 +1,7 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Docs rules
+When searching docs, please make sure you use the docs for the right version. So React 18 for React.

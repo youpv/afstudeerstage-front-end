@@ -1,0 +1,10 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Polaris Design System
+This project MUST use the polaris design system for Shopify.
+Docs: https://polaris.shopify.com/
+
+Use modern components from the lastest version (12). Try to avoid Legacy components, so by default, use Card instead of LegacyCard, but with things like EmptyState, according to the docs, you can use LegacyCard!

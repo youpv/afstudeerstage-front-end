@@ -1,0 +1,23 @@
+[
+  {
+    "id": 1,
+    "product_title": "Wireless Mouse",
+    "description_long": "A premium wireless mouse.",
+    "vendor_name": "LogiTech",
+    "price_amount": "29.99"
+  },
+  {
+    "id": 2,
+    "product_title": "Mechanical Keyboard",
+    "description_long": "Cherry MX Blue switches.",
+    "vendor_name": "Keychron",
+    "price_amount": "79.99"
+  },
+  {
+    "id": 3,
+    "product_title": "USB‑C Hub",
+    "description_long": "7‑in‑1 USB‑C hub with HDMI and card reader.",
+    "vendor_name": "Anker",
+    "price_amount": "49.99"
+  }
+] 
