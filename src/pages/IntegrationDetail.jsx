@@ -1,23 +1,8 @@
-import {
-  Page,
-  Layout,
-  Card,
-  Text,
-  BlockStack,
-  InlineStack,
-  Button,
-  Banner,
-  Badge,
-  Box,
-  Divider,
-  Modal,
-  Spinner
-} from '@shopify/polaris'
-import { EditIcon, RefreshIcon, DeleteIcon, DataTableIcon } from '@shopify/polaris-icons'
+import React from 'react'
 import { useCallback, useState, useMemo, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useIntegrations } from '../context/IntegrationContext'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import WizardStepPreview from '../components/IntegrationWizard/WizardStepPreview'
 
 // --- Helper Functions ---
@@ -261,6 +246,42 @@ const downloadFtpFile = async ({ credentials, filePath }) => {
   }
 };
 
+// Helper function to render a summary of field mappings
+const renderMappingSummary = (mapping) => {
+  if (!mapping || Object.keys(mapping).length === 0) {
+    return <p>No field mappings defined.</p>;
+  }
+
+  const renderMappingEntries = (currentMapping, prefix = '') => {
+    return Object.entries(currentMapping).map(([targetField, sourceField]) => {
+      const displayTargetField = prefix ? `${prefix}.${targetField}` : targetField;
+      if (typeof sourceField === 'object' && sourceField !== null && !Array.isArray(sourceField)) {
+        // Handle nested objects (like SEO or inventoryItem)
+        return (
+          <div key={displayTargetField} style={{ marginLeft: '1rem' }}>
+            <p style={{ margin: '0.25rem 0', fontWeight: 'bold' }}>{displayTargetField}:</p>
+            <div style={{ marginLeft: '1rem' }}>
+              {renderMappingEntries(sourceField, '')}
+            </div>
+          </div>
+        );
+      }
+      return (
+        <p key={displayTargetField} style={{ margin: '0.25rem 0' }}>
+          <strong>{displayTargetField}</strong> maps to <i>{String(sourceField)}</i>
+        </p>
+      );
+    });
+  };
+
+  return (
+    <div style={{ marginTop: '1rem', borderTop: '1px solid #eee', paddingTop: '0.5rem' }}>
+      <h4 style={{ marginBottom: '0.5rem' }}>Field Mapping Summary:</h4>
+      {renderMappingEntries(mapping)}
+    </div>
+  );
+};
+
 // --- API Functions ---
 const syncIntegrationApi = async (integrationId) => {
   // REMOVED the API fetch attempt. Directly simulate the sync.
@@ -454,17 +475,9 @@ export default function IntegrationDetail() {
 
   if (!integration) {
     return (
-      <Page>
-        <Layout>
-          <Layout.Section>
-            <Card>
-              <Banner status="critical">
-                <p>Integration not found</p>
-              </Banner>
-            </Card>
-          </Layout.Section>
-        </Layout>
-      </Page>
+      <div>
+        <h1>Loading integration details...</h1>
+      </div>
     )
   }
 
@@ -483,176 +496,90 @@ export default function IntegrationDetail() {
       'Error': 'critical',
       'Pending': 'info'
     }
-    return <Badge tone={toneMap[status] || 'info'}>{status}</Badge>
+    return <span style={{ padding: '0.1rem 0.4rem', borderRadius: '3px', display: 'inline-block', fontSize: '0.8rem', backgroundColor: toneMap[status] || 'info', color: 'white' }}>{status}</span>
   }
 
   return (
-    <Page
-      title={name}
-      subtitle="Integration Details"
-      primaryAction={{
-        content: 'Edit',
-        icon: EditIcon,
-        onAction: () => navigate(`/integrations/${id}/edit`),
-        disabled: syncMutation.isPending || deleteMutation.isPending,
-      }}
-      secondaryActions={[
-        {
-          content: 'Sync now',
-          icon: RefreshIcon,
-          onAction: handleSync,
-          loading: syncMutation.isPending,
-          disabled: deleteMutation.isPending,
-        },
-        {
-          content: 'Delete',
-          icon: DeleteIcon,
-          destructive: true,
-          onAction: handleDeleteClick,
-          loading: deleteMutation.isPending,
-          disabled: syncMutation.isPending,
-        }
-      ]}
-    >
-      <Layout>
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <InlineStack align="space-between" blockAlign="center">
-                <Text variant="headingSm" as="h2">Overview</Text>
-                <InlineStack gap="300">
-                  {getStatusBadge(status)}
-                  {lastSync && (
-                    <Text variant="bodySm" tone="subdued">
-                      Last synced: {lastSync}
-                    </Text>
+    <div>
+      <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h1>{name || 'Integration Detail'}</h1>
+        <div>
+          <button onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} style={{ marginRight: '0.5rem' }}>
+            {syncMutation.isPending ? 'Syncing...' : 'Run Sync Now'}
+          </button>
+          <button onClick={() => navigate(`/integrations/${id}/edit`)} style={{ marginRight: '0.5rem' }}>
+            Edit
+          </button>
+          <button onClick={() => setDeleteModalOpen(true)} disabled={deleteMutation.isPending} style={{ color: 'red'}}>
+            Delete
+          </button>
+        </div>
+      </div>
+      
+      {deleteModalOpen && (
+          <div style={{ border: '1px solid red', padding: '1rem', margin: '1rem 0', backgroundColor: '#fff0f0'}}>
+              <p>Are you sure you want to delete this integration? This action cannot be undone.</p>
+              <button onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending} style={{ color: 'white', backgroundColor: 'red', marginRight: '0.5rem'}}>
+                {deleteMutation.isPending ? 'Deleting...' : 'Confirm Delete'}
+              </button>
+              <button onClick={() => setDeleteModalOpen(false)} disabled={deleteMutation.isPending}>
+                Cancel
+              </button>
+              {deleteMutation.isError && <p style={{color: 'red', marginTop: '0.5rem'}}>Error deleting: {deleteMutation.error.message}</p>}
+          </div>
+      )}
+
+      {syncMutation.isSuccess && <div style={{border: '1px solid green', padding: '0.5rem', margin: '1rem 0', backgroundColor: '#f0fff0'}}>Sync triggered successfully.</div>}
+      {syncMutation.isError && <div style={{border: '1px solid red', padding: '0.5rem', margin: '1rem 0', backgroundColor: '#fff0f0'}}>Error triggering sync: {syncMutation.error.message}</div>}
+      
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem' }}>
+          <div>
+              <div style={{ border: '1px solid #eee', padding: '1rem', marginBottom: '1rem'}}>
+                  <h3>Integration Details</h3>
+                  <p><strong>Type:</strong> {connectionType}</p>
+                  <p><strong>Frequency:</strong> Syncs every {syncFrequency} hours</p>
+                  {connectionType === 'ftp' && integration.credentials && (
+                      <>
+                          <p><strong>FTP Host:</strong> {integration.credentials.ftpHost}</p>
+                          <p><strong>FTP Port:</strong> {integration.credentials.ftpPort}</p>
+                          <p><strong>FTP User:</strong> {integration.credentials.ftpUser}</p>
+                          <p><strong>File Path:</strong> {integration.credentials.filePath}</p>
+                          <p><strong>Data Path:</strong> {integration.credentials.dataPath || ''}</p>
+                      </>
                   )}
-                </InlineStack>
-              </InlineStack>
-
-              {/* Display Sync Error */} 
-              {syncMutation.isError && (
-                <Banner status="critical">
-                  <p>Sync failed: {(syncMutation.error instanceof Error) ? syncMutation.error.message : 'Unknown error'}</p>
-                </Banner>
-              )}
-
-              <BlockStack gap="400">
-                <BlockStack gap="200">
-                  <Text variant="headingXs" as="h3">Connection Details</Text>
-                  <InlineStack wrap={false} gap="400">
-                    <Box width="200px">
-                      <BlockStack gap="100">
-                        <Text variant="bodySm" tone="subdued">Type</Text>
-                        <Text variant="bodyMd">{connectionType}</Text>
-                      </BlockStack>
-                    </Box>
-                    <BlockStack gap="100">
-                      <Text variant="bodySm" tone="subdued">Sync Frequency</Text>
-                      <Text variant="bodyMd">Every {syncFrequency} hours</Text>
-                    </BlockStack>
-                  </InlineStack>
-                </BlockStack>
-
-                {/* Display mutation status during sync */} 
-                {syncMutation.isPending && (
-                  <InlineStack gap="200" blockAlign="center">
-                    <Spinner size="small" />
-                    <Text tone="subdued">Syncing...</Text>
-                  </InlineStack>
-                )}
-
-                {description && (
-                  <>
-                    <Divider />
-                    <BlockStack gap="200">
-                      <Text variant="headingXs" as="h3">Description</Text>
-                      <Text variant="bodyMd">{description}</Text>
-                    </BlockStack>
-                  </>
-                )}
-              </BlockStack>
-            </BlockStack>
-          </Card>
-        </Layout.Section>
-
-        <Layout.Section>
-          <Card>
-            <BlockStack gap="400">
-              <Text variant="headingSm" as="h2">Product Data Preview</Text>
+              </div>
               
+              <div style={{ border: '1px solid #eee', padding: '1rem', marginBottom: '1rem'}}>
+                  <h3>Field Mapping Summary</h3>
+                  {renderMappingSummary(integration.mapping)}
+              </div>
+              
+              <div style={{ border: '1px solid #eee', padding: '1rem'}}>
+                  <h3>Source Data Status</h3>
+                  <button onClick={fetchData} disabled={dataLoading} style={{marginBottom: '0.5rem'}}>Refresh Source Data</button>
+                  {dataLoading ? <p>Loading source data...</p> : dataError ? <div style={{color: 'red'}}>Error loading source data: {dataError}</div> : <p>Source data loaded successfully.</p>}
+              </div>
+          </div>
+          
+          <div style={{ border: '1px solid #eee', padding: '1rem' }}>
+              <h3>Data Preview</h3>
               {dataLoading ? (
-                <Box padding="400">
-                  <InlineStack gap="200" align="center" blockAlign="center">
-                    <Spinner size="small" />
-                    <Text>Loading integration data...</Text>
-                  </InlineStack>
-                </Box>
+                 <p>Loading data for preview...</p>
               ) : dataError ? (
-                <Banner status="critical">
-                  <p>Failed to load integration data: {dataError}</p>
-                </Banner>
-              ) : (!processedData || !mappedPreviewData) ? (
-                <Box padding="400">
-                  <Text alignment="center" tone="subdued">No data available. Try syncing the integration.</Text>
-                </Box>
+                 <p style={{color: 'red'}}>Cannot show preview due to source data error.</p>
+              ) : processedData ? (
+                 <WizardStepPreview
+                    stepTitle="Mapped Product Preview"
+                    processedPreviewData={processedData}
+                    mappedPreviewData={mappedPreviewData}
+                    currentPreviewIndex={currentPreviewIndex}
+                    setCurrentPreviewIndex={setCurrentPreviewIndex}
+                  />
               ) : (
-                <WizardStepPreview
-                  stepTitle=""
-                  processedPreviewData={processedData}
-                  mappedPreviewData={mappedPreviewData}
-                  currentPreviewIndex={currentPreviewIndex}
-                  setCurrentPreviewIndex={setCurrentPreviewIndex}
-                />
+                  <p>No source data loaded to generate preview.</p>
               )}
-            </BlockStack>
-          </Card>
-        </Layout.Section>
-      </Layout>
-
-      <Modal
-        open={deleteModalOpen}
-        onClose={handleDeleteCancel}
-        title="Delete integration"
-        primaryAction={{
-          content: 'Delete',
-          destructive: true,
-          onAction: handleDeleteConfirm,
-        }}
-        secondaryActions={[
-          {
-            content: 'Cancel',
-            onAction: handleDeleteCancel,
-          },
-        ]}
-      >
-        <Modal.Section>
-          <BlockStack gap="200">
-            <Text>
-              Are you sure you want to delete the "{name}" integration? This action cannot be undone.
-            </Text>
-            <Text tone="subdued">
-              All connected data and mappings will be permanently removed.
-            </Text>
-            {/* Display Delete Error in Modal */} 
-            {deleteMutation.isError && (
-              <Box paddingTop="200">
-                <Banner status="critical">
-                  Delete failed: {(deleteMutation.error instanceof Error) ? deleteMutation.error.message : 'Unknown error'}
-                </Banner>
-              </Box>
-            )}
-            {deleteMutation.isPending && (
-              <Box paddingTop="200">
-                <InlineStack gap="200" blockAlign="center">
-                  <Spinner size="small" />
-                  <Text tone="subdued">Deleting...</Text>
-                </InlineStack>
-              </Box>
-            )}
-          </BlockStack>
-        </Modal.Section>
-      </Modal>
-    </Page>
+          </div>
+      </div>
+    </div>
   )
 } 

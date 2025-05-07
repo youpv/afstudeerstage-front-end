@@ -197,6 +197,399 @@ class FTPService {
    * @returns {Promise<Object|string|Buffer>} - Downloaded file content.
    */
   async downloadFile(credentials, remotePath) {
+    // --- START MOCK ---
+    this.log(`FTPService.downloadFile: MOCKING FTP RESPONSE for path: ${remotePath}`);
+    // Simulate a delay to emulate network latency
+    const delay = 1000 + Math.random() * 1000; // Delay between 1 to 2 seconds
+    await new Promise(resolve => setTimeout(resolve, delay));
+
+    const mockedData = {
+        "products": [
+            {
+                "id": "3100000025",
+                "title": "DURACELL Alkaline Plus 3LR12 | MN1203",
+                "sku": "3100000025",
+                "ean": "5000394146235",
+                "ean_case": "0",
+                "ean_extra": [
+                    5000394019317,
+                    5000394038226,
+                    5000394105508,
+                    5000394114623
+                ],
+                "description": "DURACELL Alkaline Plus 3LR12 | MN1203 - 4.5 V - 5400 mAh Battery",
+                "tags": [
+                    "Batterij",
+                    "3LR12"
+                ],
+                "salesunit": "BLIST",
+                "shortcode": "MN1203",
+                "orig_code": "05010694",
+                "weight": 0.17,
+                "price": 2.82,
+                "stores": [
+                    "ESHOPBE"
+                ],
+                "min_ord_qty": 1,
+                "related": [
+                    "3125003031"
+                ],
+                "env_cont": 5.3,
+                "disposal_fee": 0.18,
+                "brand": "Duracell",
+                "properties": [
+                    {
+                        "prop_code": "BAT_TYPE",
+                        "prop_name": "Battery type:",
+                        "prod_value": "Alkaline Plus"
+                    },
+                    {
+                        "prop_code": "BAT_EXEC",
+                        "prop_name": "Battery model:",
+                        "prod_value": "Special"
+                    },
+                    {
+                        "prop_code": "P_TYPE",
+                        "prop_name": "Packaging type:",
+                        "prod_value": "Single pack"
+                    },
+                    {
+                        "prop_code": "BAT_CODE",
+                        "prop_name": "Battery code:",
+                        "prod_value": "3LR12 | MN1203"
+                    },
+                    {
+                        "prop_code": "CODE_SYNO",
+                        "prop_name": "Battery Code Synonym:",
+                        "prod_value": "312A"
+                    },
+                    {
+                        "prop_code": "APPRO_FOR",
+                        "prop_name": "Appropriate for:",
+                        "prod_value": "Flashlight + Bicycle + Small Appliances"
+                    },
+                    {
+                        "prop_code": "WATCH_BAT",
+                        "prop_name": "Watch battery:",
+                        "prod_value": "No"
+                    },
+                    {
+                        "prop_code": "VOLT",
+                        "prop_name": "Voltage:",
+                        "prod_value": "4.5 V"
+                    },
+                    {
+                        "prop_code": "BAT_CAP",
+                        "prop_name": "Battery capacity:",
+                        "prod_value": "5400 mAh"
+                    },
+                    {
+                        "prop_code": "RECHAR",
+                        "prop_name": "Rechargeable:",
+                        "prod_value": "No"
+                    },
+                    {
+                        "prop_code": "P_CONTENT",
+                        "prop_name": "Packing content:",
+                        "prod_value": "1 Piece"
+                    },
+                    {
+                        "prop_code": "P_FORM",
+                        "prop_name": "Packaging form:",
+                        "prod_value": "Blister"
+                    },
+                    {
+                        "prop_code": "SIZE",
+                        "prop_name": "Size:",
+                        "prod_value": "65 x 61 x 21 mm"
+                    },
+                    {
+                        "prop_code": "LANG",
+                        "prop_name": "Languages on packaging:",
+                        "prod_value": "EN - NL - DE - FR - ES - IT"
+                    }
+                ],
+                "model": [
+                    "31.000.000.25",
+                    "BAT0006",
+                    "MN 1203",
+                    "3 LR 12",
+                    "312 A",
+                    "4,5 V"
+                ]
+            },
+            {
+                "id": "3100000042",
+                "title": "DURACELL Silveroxide 392 | 384 | SR41  - Button cell",
+                "sku": "3100000042",
+                "ean": "5000394067929",
+                "ean_case": "0",
+                "ean_extra": [
+                    50953110
+                ],
+                "description": "DURACELL Silveroxide 392 | 384 | SR41  - 1.55 V - 40 mAh - Button cell",
+                "tags": [
+                    "Batterij"
+                ],
+                "salesunit": "BLIST",
+                "shortcode": "392/384",
+                "orig_code": "05007313",
+                "weight": 0.005,
+                "price": 1.36,
+                "stores": [
+                    "ESHOPBE"
+                ],
+                "min_ord_qty": 1,
+                "alternative_products": [
+                    "3125000392"
+                ],
+                "env_cont": 10.6,
+                "brand": "Duracell",
+                "properties": [
+                    {
+                        "prop_code": "BAT_TYPE",
+                        "prop_name": "Battery type:",
+                        "prod_value": "Silveroxide"
+                    },
+                    {
+                        "prop_code": "BAT_EXEC",
+                        "prop_name": "Battery model:",
+                        "prod_value": "Button cell"
+                    },
+                    {
+                        "prop_code": "P_TYPE",
+                        "prop_name": "Packaging type:",
+                        "prod_value": "Single pack"
+                    },
+                    {
+                        "prop_code": "BAT_CODE",
+                        "prop_name": "Battery code:",
+                        "prod_value": "392 | 384 | SR41"
+                    },
+                    {
+                        "prop_code": "CODE_SYNO",
+                        "prop_name": "Battery Code Synonym:",
+                        "prod_value": "V392 | V384 | SR41W | SR41WS"
+                    },
+                    {
+                        "prop_code": "APPRO_FOR",
+                        "prop_name": "Appropriate for:",
+                        "prod_value": "Watches"
+                    },
+                    {
+                        "prop_code": "WATCH_BAT",
+                        "prop_name": "Watch battery:",
+                        "prod_value": "Yes"
+                    },
+                    {
+                        "prop_code": "VOLT",
+                        "prop_name": "Voltage:",
+                        "prod_value": "1.55 V"
+                    },
+                    {
+                        "prop_code": "BAT_CAP",
+                        "prop_name": "Battery capacity:",
+                        "prod_value": "40 mAh"
+                    },
+                    {
+                        "prop_code": "RECHAR",
+                        "prop_name": "Rechargeable:",
+                        "prod_value": "No"
+                    },
+                    {
+                        "prop_code": "P_CONTENT",
+                        "prop_name": "Packing content:",
+                        "prod_value": "1 Piece"
+                    },
+                    {
+                        "prop_code": "P_FORM",
+                        "prop_name": "Packaging form:",
+                        "prod_value": "Blister"
+                    },
+                    {
+                        "prop_code": "SIZE",
+                        "prop_name": "Size:",
+                        "prod_value": "7.9 x 3.6 mm"
+                    },
+                    {
+                        "prop_code": "LANG",
+                        "prop_name": "Languages on packaging:",
+                        "prod_value": "EN - NL - DE - FR - ES - IT"
+                    }
+                ],
+                "model": [
+                    "31.000.000.42",
+                    "GPB1048",
+                    "GPB1056",
+                    "0000050953110",
+                    "3100000064",
+                    "AG 3",
+                    "AG-3",
+                    "CR 392",
+                    "D 384",
+                    "D 392",
+                    "FC 9327",
+                    "G 3",
+                    "G 3 A",
+                    "GP 192",
+                    "GP 384",
+                    "HORLOGE",
+                    "L 736",
+                    "L 736 H",
+                    "LR 41",
+                    "LR 736",
+                    "MS 312",
+                    "SB-A 1",
+                    "SB-B 1",
+                    "SB-D 1",
+                    "SR 41",
+                    "SR 41 SW",
+                    "SR 41 W",
+                    "T 192",
+                    "V 3 GA",
+                    "V 384",
+                    "V 392",
+                    "V 527",
+                    "V 547",
+                    "1,55 V",
+                    "192",
+                    "247",
+                    "247 B",
+                    "280-13",
+                    "280-18",
+                    "384",
+                    "392",
+                    "392 A",
+                    "527",
+                    "547"
+                ]
+            },
+            {
+                "id": "3100000046",
+                "title": "DURACELL Alkaline LR44 | A76 - Duo Pack - Button cell",
+                "sku": "3100000046",
+                "ean": "5000394504424",
+                "ean_case": "0",
+                "ean_extra": [
+                    50936915
+                ],
+                "description": "DURACELL Alkaline LR44 | A76 - Duo Pack - 1.5 V - 150 mAh - Button cell",
+                "tags": [
+                    "Batterij"
+                ],
+                "salesunit": "BLIST",
+                "shortcode": "LR44",
+                "orig_code": "05007795",
+                "weight": 0.01,
+                "price": 0.96,
+                "stores": [
+                    "ESHOPBE"
+                ],
+                "min_ord_qty": 1,
+                "related": [
+                    "3100000446",
+                    "3125000244"
+                ],
+                "env_cont": 10.6,
+                "disposal_fee": 0.01,
+                "brand": "Duracell",
+                "properties": [
+                    {
+                        "prop_code": "BAT_TYPE",
+                        "prop_name": "Battery type:",
+                        "prod_value": "Alkaline"
+                    },
+                    {
+                        "prop_code": "BAT_EXEC",
+                        "prop_name": "Battery model:",
+                        "prod_value": "Button cell"
+                    },
+                    {
+                        "prop_code": "P_TYPE",
+                        "prop_name": "Packaging type:",
+                        "prod_value": "Duo Pack"
+                    },
+                    {
+                        "prop_code": "BAT_CODE",
+                        "prop_name": "Battery code:",
+                        "prod_value": "LR44 | A76"
+                    },
+                    {
+                        "prop_code": "CODE_SYNO",
+                        "prop_name": "Battery Code Synonym:",
+                        "prod_value": "V13GA | 76A"
+                    },
+                    {
+                        "prop_code": "APPRO_FOR",
+                        "prop_name": "Appropriate for:",
+                        "prod_value": "Watches + Small Appliances"
+                    },
+                    {
+                        "prop_code": "WATCH_BAT",
+                        "prop_name": "Watch battery:",
+                        "prod_value": "Yes"
+                    },
+                    {
+                        "prop_code": "VOLT",
+                        "prop_name": "Voltage:",
+                        "prod_value": "1.5 V"
+                    },
+                    {
+                        "prop_code": "BAT_CAP",
+                        "prop_name": "Battery capacity:",
+                        "prod_value": "150 mAh"
+                    },
+                    {
+                        "prop_code": "RECHAR",
+                        "prop_name": "Rechargeable:",
+                        "prod_value": "No"
+                    },
+                    {
+                        "prop_code": "P_CONTENT",
+                        "prop_name": "Packing content:",
+                        "prod_value": "2 Pieces"
+                    },
+                    {
+                        "prop_code": "P_FORM",
+                        "prop_name": "Packaging form:",
+                        "prod_value": "Blister"
+                    },
+                    {
+                        "prop_code": "SIZE",
+                        "prop_name": "Size:",
+                        "prod_value": "11.5 x 5.4 mm"
+                    },
+                    {
+                        "prop_code": "LANG",
+                        "prop_name": "Languages on packaging:",
+                        "prod_value": "EN - NL - DE - FR - ES - IT"
+                    }
+                ],
+                "model": [
+                    "31.000.000.46",
+                    "B11",
+                    "A 160",
+                    "A 76",
+                    "AG 13",
+                    "ALKALINE",
+                    "G 13",
+                    "KA 76",
+                    "L 1154",
+                    "LR 44",
+                    "PX 76 A",
+                    "V 13 GA",
+                    "1,5 V",
+                    "2 PACK",
+                    "76 A"
+                ]
+            }
+        ]
+    };
+    return mockedData; // Since the function is async, this will be wrapped in a Promise.
+    // --- END MOCK ---
+
+    /*
+    // Original code:
     return this._withRetry(async (client) => {
       // Create an in‑memory buffer by streaming the download into a Writable
       const { Writable } = await import('stream')
@@ -234,6 +627,7 @@ class FTPService {
         return buffer // Return raw buffer if decoding fails
       }
     }, credentials)
+    */
   }
 
   /**
@@ -260,6 +654,19 @@ class FTPService {
    * @returns {Promise<{success: boolean, error: string | null}>} - Object indicating success and potential error message.
    */
   async testConnection(credentials) {
+    // Allow immediate success when using specific mock credentials (e.g., during local development)
+    // If the provided host, user, and password match the specific mock values,
+    // we skip any attempt to open a real FTP connection and return success.
+    // This enables the wizard connection step to work entirely with mocked data.
+    const isMockHost = credentials?.host && String(credentials.host).toLowerCase() === 'ftp.fightclub.nl';
+    const isMockUser = credentials?.user && String(credentials.user) === 'Fightclub';
+    const isMockPassword = credentials?.password && String(credentials.password) === 'Pixels';
+
+    if (isMockHost && isMockUser && isMockPassword) {
+      this.log('FTPService.testConnection: Detected specific mock credentials – returning success without network call');
+      return { success: true, error: null };
+    }
+
     try {
       // The operation inside _withRetry doesn't really matter for test,
       // as _withRetry will throw if connection fails during _getConnection.

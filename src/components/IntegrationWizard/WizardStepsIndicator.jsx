@@ -1,29 +1,28 @@
-import { Badge, InlineStack } from '@shopify/polaris'
-
 /**
  * Renders the progress indicator badges for the wizard steps.
  * @param {{ steps: string[], currentStep: number }} props
  */
 function WizardStepsIndicator({ steps, currentStep }) {
   return (
-    <InlineStack gap="200" wrap={false}>
+    <div>
       {steps.map((label, idx) => {
-        const isCompleted = idx < currentStep
-        const isCurrent = idx === currentStep
-        const progress = isCompleted
-          ? 'complete'
-          : isCurrent
-          ? 'partiallyComplete'
-          : 'incomplete'
-        const tone = isCompleted ? 'success' : isCurrent ? 'attention' : undefined
+        const isCompleted = idx < currentStep;
+        const isCurrent = idx === currentStep;
+        let statusText = '';
+        if (isCurrent) {
+          statusText = ' (Current)';
+        } else if (isCompleted) {
+          statusText = ' (Completed)';
+        }
+
         return (
-          <Badge key={label} tone={tone} progress={progress}>
-            {label}
-          </Badge>
-        )
+          <span key={label}>
+            {label}{statusText}
+          </span>
+        );
       })}
-    </InlineStack>
-  )
+    </div>
+  );
 }
 
-export default WizardStepsIndicator 
+export default WizardStepsIndicator; 

@@ -1,22 +1,7 @@
-import {
-  Page,
-  Layout,
-  Card,
-  EmptyState,
-  ResourceList,
-  ResourceItem,
-  Text,
-  InlineStack,
-  BlockStack,
-  ButtonGroup,
-  Button,
-  Filters,
-  Pagination,
-} from '@shopify/polaris'
-import { PlusIcon, EditIcon, DeleteIcon, RefreshIcon } from '@shopify/polaris-icons'
 import { useCallback, useState, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useIntegrations } from '../context/IntegrationContext.jsx'
+import { Link } from 'react-router-dom'
 
 // --- API Simulation (Should match IntegrationDetail) ---
 const syncIntegrationApi = async (integrationId) => {
@@ -84,10 +69,15 @@ function Dashboard({
     setCurrentPage(1)
   }, [])
 
-  const handleFiltersChange = useCallback((value) => {
-    setQueryValue(value)
+  const handleQueryChange = useCallback((event) => {
+    setQueryValue(event.target.value)
     setCurrentPage(1)
   }, [])
+  
+  const handleClearQuery = useCallback(() => {
+      setQueryValue('');
+      setCurrentPage(1);
+  }, []);
 
   const handlePageChange = useCallback((page) => {
     setCurrentPage(page)
@@ -96,34 +86,31 @@ function Dashboard({
   const handleSyncClick = useCallback((id) => {
      setSyncingId(id);
      syncMutation.mutate(id);
-     // Call the original onSync prop if it exists and might do other things
      if (onSync) {
        onSync(id);
      }
   }, [syncMutation, onSync]);
 
-  const sortOptions = [
-    { label: 'Name', value: 'name' },
-    { label: 'Connection Type', value: 'connectionType' },
-    { label: 'Sync Frequency', value: 'syncFrequency' },
-  ]
-
   const filterControl = (
-    <Filters
-      queryValue={queryValue}
-      filters={[]}
-      onQueryChange={handleFiltersChange}
-      onQueryClear={() => setQueryValue('')}
-      onClearAll={() => {
-        setQueryValue('')
-      }}
-    />
+    <div style={{ marginBottom: '1rem' }}>
+      <label htmlFor="integrationFilter">Filter Integrations:</label>
+      <input 
+        type="text" 
+        id="integrationFilter" 
+        value={queryValue} 
+        onChange={handleQueryChange} 
+        placeholder="Filter by name or type..." 
+        style={{ marginLeft: '0.5rem', marginRight: '0.5rem'}}
+      />
+      <button onClick={handleClearQuery} disabled={!queryValue}>Clear</button>
+    </div>
   )
 
   const hasIntegrations = integrations.length > 0
 
   const filteredIntegrations = integrations
     .filter((integration) => {
+      if (!integration || !integration.name || !integration.connectionType) return false; // Safety check
       const matchesQuery = integration.name.toLowerCase().includes(queryValue.toLowerCase()) ||
         integration.connectionType.toLowerCase().includes(queryValue.toLowerCase())
       return matchesQuery
@@ -135,7 +122,8 @@ function Dashboard({
         case 'connectionType':
           return a.connectionType.localeCompare(b.connectionType)
         case 'syncFrequency':
-          return a.syncFrequency - b.syncFrequency
+          // Ensure comparison is numeric
+          return (Number(a.syncFrequency) || 0) - (Number(b.syncFrequency) || 0)
         default:
           return 0
       }
@@ -146,131 +134,162 @@ function Dashboard({
     currentPage * ITEMS_PER_PAGE
   )
 
-  const renderItem = useCallback((item) => {
+  const handleSelectionChange = (itemId, isChecked) => {
+      setSelectedItems(prevSelected => {
+          if (isChecked) {
+              return [...prevSelected, itemId];
+          } else {
+              return prevSelected.filter(id => id !== itemId);
+          }
+      });
+  };
+  
+  const handleSelectAll = (event) => {
+      if (event.target.checked) {
+          setSelectedItems(paginatedIntegrations.map(item => item.id));
+      } else {
+          setSelectedItems([]);
+      }
+  };
+  
+  const isAllSelected = paginatedIntegrations.length > 0 && selectedItems.length === paginatedIntegrations.length;
+  
+  const renderTableRows = paginatedIntegrations.map((item) => {
     const { id, name, connectionType, syncFrequency } = item
-    // Assuming 'url' is part of the item data or constructed
-    const itemUrl = `/integrations/${id}` // Example URL
+    const itemUrl = `/integrations/${id}`
+    const isSelected = selectedItems.includes(id);
 
     return (
-      <ResourceItem
-        id={id}
-        url={itemUrl} // Make the item clickable (optional)
-        accessibilityLabel={`View details for ${name}`}
-        persistActions
-      >
-        <InlineStack align="space-between" blockAlign="center" wrap={false}>
-          <BlockStack gap="100">
-            <Text variant="bodyMd" fontWeight="bold" as="h3">
-              {name}
-            </Text>
-            <InlineStack gap="100" align="center">
-              <Text variant="bodySm" tone="subdued">{connectionType}</Text>
-              <Text variant="bodySm" tone="subdued">— Syncs every {syncFrequency}h</Text>
-            </InlineStack>
-          </BlockStack>
-          <ButtonGroup>
-            <Button
-              icon={RefreshIcon}
-              accessibilityLabel={`Sync ${name}`}
-              onClick={(event) => {
-                event.stopPropagation()
-                handleSyncClick(id)
-              }}
-              variant="tertiary"
-              loading={syncingId === id}
-              disabled={syncMutation.isPending}
-            />
-            <Button
-              icon={EditIcon}
-              accessibilityLabel={`Edit ${name}`}
-              onClick={(event) => {
-                event.stopPropagation()
-                onEdit(id)
-              }}
-              variant="tertiary"
-            />
-            <Button
-              icon={DeleteIcon}
-              accessibilityLabel={`Delete ${name}`}
-              onClick={(event) => {
-                event.stopPropagation()
-                onDelete(id)
-              }}
-              variant="tertiary"
-              tone="critical"
-            />
-          </ButtonGroup>
-        </InlineStack>
-      </ResourceItem>
+      <tr key={id}>
+        <td>
+          <input 
+            type="checkbox" 
+            checked={isSelected} 
+            onChange={(e) => handleSelectionChange(id, e.target.checked)} 
+            aria-label={`Select ${name}`}
+          />
+        </td>
+        <td><Link to={itemUrl}>{name}</Link></td>
+        <td>{connectionType}</td>
+        <td>{syncFrequency}h</td>
+        <td>
+          <button 
+            onClick={() => handleSyncClick(id)} 
+            disabled={syncMutation.isPending || syncingId === id} 
+            style={{marginRight: '5px'}}
+            title={`Sync ${name}`}
+            >
+            {syncingId === id ? 'Syncing...' : 'Sync'}
+          </button>
+          <button onClick={() => onEdit(id)} style={{marginRight: '5px'}} title={`Edit ${name}`}>Edit</button>
+          <button onClick={() => onDelete(id)} style={{color: 'red'}} title={`Delete ${name}`}>Delete</button>
+        </td>
+      </tr>
     )
-  }, [onEdit, onDelete, handleSyncClick, syncingId, syncMutation.isPending])
-
+  });
 
   const emptyStateMarkup = (
-    <Card roundedAbove="sm">
-      <EmptyState
-        heading="Manage your data integrations"
-        action={{ content: 'Create integration', icon: PlusIcon, onAction: onCreate }}
-        secondaryAction={{
-          content: 'Learn more',
-          onAction: handleLearnMore,
-        }}
-        image="https://cdn.shopify.com/s/files/1/0757/9955/files/empty-state.svg"
-        imageContained // Constrains image width for better layout
-      >
-        <Text variant="bodyMd" tone="subdued">
-          Connect your ERP, PIM, or other data sources to automatically sync product information with Shopify.
-        </Text>
-      </EmptyState>
-    </Card>
+    <div style={{ border: '1px solid #eee', padding: '2rem', textAlign: 'center' }}>
+      <img 
+        src="https://cdn.shopify.com/s/files/1/0757/9955/files/empty-state.svg" 
+        alt="" 
+        style={{ maxWidth: '150px', marginBottom: '1rem' }}
+      />
+      <h2>Manage your data integrations</h2>
+      <p style={{ color: 'gray', marginBottom: '1rem' }}>
+        Connect your ERP, PIM, or other data sources to automatically sync product information with Shopify.
+      </p>
+      <button onClick={onCreate} style={{ marginRight: '0.5rem' }}>Create integration</button>
+      <button onClick={handleLearnMore}>Learn more</button>
+    </div>
   )
 
   const integrationsListMarkup = (
-    <Card roundedAbove="sm">
-      <ResourceList
-        resourceName={{ singular: 'integration', plural: 'integrations' }}
-        items={paginatedIntegrations}
-        renderItem={renderItem}
-        selectedItems={selectedItems}
-        onSelectionChange={setSelectedItems}
-        sortOptions={sortOptions}
-        sortValue={sortValue}
-        onSortChange={handleSortChange}
-        filterControl={filterControl}
-        loading={syncMutation.isPending}
-      />
+    <div>
+      {filterControl}
+      {syncMutation.isPending && <p>Loading integrations...</p>}
+      
+      {selectedItems.length > 0 && (
+           <div style={{margin: '0.5rem 0', padding: '0.5rem', border: '1px solid blue'}}>Bulk actions for {selectedItems.length} items (e.g., delete selected) would go here.</div>
+      )}
+      
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            <th style={{ textAlign: 'left', padding: '8px', borderBottom: '1px solid #ccc'}}>
+                <input 
+                    type="checkbox"
+                    onChange={handleSelectAll}
+                    checked={isAllSelected}
+                    aria-label="Select all integrations on this page"
+                 />
+            </th>
+            <th style={{ textAlign: 'left', padding: '8px', borderBottom: '1px solid #ccc'}}>
+              Name 
+              <button onClick={() => handleSortChange('name')} style={{ marginLeft: '5px', fontSize: '0.8em' }} title="Sort by Name">
+                {sortValue === 'name' ? '▲' : '↕'}
+              </button>
+            </th>
+            <th style={{ textAlign: 'left', padding: '8px', borderBottom: '1px solid #ccc'}}>
+              Type
+              <button onClick={() => handleSortChange('connectionType')} style={{ marginLeft: '5px', fontSize: '0.8em' }} title="Sort by Type">
+                 {sortValue === 'connectionType' ? '▲' : '↕'}
+              </button>
+            </th>
+            <th style={{ textAlign: 'left', padding: '8px', borderBottom: '1px solid #ccc'}}>
+              Frequency
+              <button onClick={() => handleSortChange('syncFrequency')} style={{ marginLeft: '5px', fontSize: '0.8em' }} title="Sort by Frequency">
+                {sortValue === 'syncFrequency' ? '▲' : '↕'}
+              </button>
+            </th>
+            <th style={{ textAlign: 'left', padding: '8px', borderBottom: '1px solid #ccc'}}>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {renderTableRows}
+        </tbody>
+      </table>
+      
       {filteredIntegrations.length > ITEMS_PER_PAGE && (
-        <div style={{ padding: '1rem' }}>
-          <Pagination
-            hasPrevious={currentPage > 1}
-            hasNext={currentPage < Math.ceil(filteredIntegrations.length / ITEMS_PER_PAGE)}
-            onPrevious={() => handlePageChange(currentPage - 1)}
-            onNext={() => handlePageChange(currentPage + 1)}
-            label={`${(currentPage - 1) * ITEMS_PER_PAGE + 1}-${Math.min(
+        <div style={{ padding: '1rem', textAlign: 'center' }}>
+          <button 
+            onClick={() => handlePageChange(currentPage - 1)} 
+            disabled={currentPage <= 1}
+            style={{marginRight: '10px'}}
+          >
+            Previous
+          </button>
+          <span>
+            {`${(currentPage - 1) * ITEMS_PER_PAGE + 1}-${Math.min(
               currentPage * ITEMS_PER_PAGE,
               filteredIntegrations.length
             )} of ${filteredIntegrations.length}`}
-          />
+          </span>
+          <button 
+            onClick={() => handlePageChange(currentPage + 1)} 
+            disabled={currentPage >= Math.ceil(filteredIntegrations.length / ITEMS_PER_PAGE)}
+            style={{marginLeft: '10px'}}
+           >
+            Next
+          </button>
         </div>
       )}
-    </Card>
+    </div>
   )
 
   return (
-    <Page
-      title="Integrations Dashboard"
-      primaryAction={hasIntegrations ? { // Only show primary action if needed, or adjust logic
-        content: 'Create integration',
-        icon: PlusIcon,
-        onAction: onCreate,
-      } : null}
-    >
-      <Layout>
-        <Layout.Section>
+    <div>
+      <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+          <h1>Integrations Dashboard</h1>
+          <button onClick={onCreate}>Create Integration</button>
+      </div>
+      
+      <div>
+        <div>
           {hasIntegrations ? integrationsListMarkup : emptyStateMarkup}
-        </Layout.Section>
-      </Layout>
-    </Page>
+        </div>
+      </div>
+    </div>
   )
 }
 

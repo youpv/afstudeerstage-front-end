@@ -1,43 +1,42 @@
-import { BlockStack, Text, Card, Divider, ButtonGroup, Button, InlineStack, Box, DescriptionList, Badge, Tag } from '@shopify/polaris';
-import { ChevronLeftIcon, ChevronRightIcon } from '@shopify/polaris-icons';
 import { useMemo } from 'react';
-
+import React from 'react';
 
 // --- Helper Functions ---
 
 // Helper function to render value (handles arrays, objects, null/undefined)
 const renderValue = (value) => {
+  if (value === null || value === undefined || String(value).trim() === '') {
+      return <span style={{ fontStyle: 'italic', color: 'gray' }}>_empty_</span>;
+  }
   if (Array.isArray(value)) {
-    // Handle potentially long arrays by truncating
-    const displayItems = value.slice(0, 5); // Show first 5 items
+    const displayItems = value.slice(0, 5); 
     const truncated = value.length > 5 ? '...' : '';
     return `[${displayItems.join(', ')}${truncated}]`;
   } else if (typeof value === 'object' && value !== null) {
-    // Attempt to stringify, but handle potential large objects
     try {
       const jsonString = JSON.stringify(value);
-      if (jsonString.length > 100) { // Limit length
+      if (jsonString.length > 100) {
         return jsonString.substring(0, 100) + '...';
       }
       return jsonString;
     } catch (e) {
-      console.warn('[WizardStepPreview] Error stringifying object:', e); // Log the error instead of ignoring
-      return '[Object]'; // Fallback
+      console.warn('[WizardStepPreview] Error stringifying object:', e);
+      return '[Object]';
     }
-  } else if (value === null || value === undefined || String(value).trim() === '') {
-      return <Text as="span" tone="subdued">_empty_</Text>;
   }
   return String(value);
 };
 
-// Helper to create DescriptionList items, skipping empty values
-const createDescriptionListItems = (itemsObject) => {
+// Helper to create definition list items, skipping empty values
+const createDefinitionListItems = (itemsObject) => {
     return Object.entries(itemsObject)
-        .filter(([/* key */, value]) => value !== null && value !== undefined && String(value).trim() !== '') // Filter out empty values, comment out unused key
-        .map(([key, value]) => ({
-            term: key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()), // Format key nicely
-            description: renderValue(value),
-        }));
+        .filter(([/* key */, value]) => value !== null && value !== undefined && String(value).trim() !== '')
+        .map(([key, value]) => (
+            <React.Fragment key={key}> 
+              <dt>{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</dt>
+              <dd>{renderValue(value)}</dd>
+            </React.Fragment>
+        ));
 };
 
 /**
@@ -59,10 +58,6 @@ function WizardStepPreview({
   const isArray = Array.isArray(processedPreviewData);
   const totalItems = isArray ? processedPreviewData.length : processedPreviewData ? 1 : 0;
 
-  // --- DEBUGGING --- 
-  
-  // --- END DEBUGGING ---
-
   const handlePrevious = () => {
     setCurrentPreviewIndex(Math.max(0, currentPreviewIndex - 1));
   };
@@ -75,103 +70,75 @@ function WizardStepPreview({
   const canGoPrevious = canNavigate && currentPreviewIndex > 0;
   const canGoNext = canNavigate && currentPreviewIndex < totalItems - 1;
 
-  // --- Data Extraction and Preparation for Rendering ---
-
   const {
-      // Primary Fields
       title,
       status,
       bodyHtml,
       vendor,
       productType,
       tags,
-
-      // Nested Structures
-      seo, // { title, description }
-      inventoryItem, // { sku, barcode, price, compareAtPrice, weight, weightUnit, inventoryPolicy, inventoryQuantity, inventoryManagement, taxable, taxCode, cost, requiresShipping, harmonizedSystemCode }
-
-      // Metafields
-      metafields, // Array: { namespace, key, type, value }
-
-      // Other Top-Level Fields (Explicitly handle known ones if they appear here unexpectedly)
+      seo, 
+      inventoryItem, 
+      metafields,
       publishedAt,
       requiresSellingPlan,
       templateSuffix,
-      handle, // Product handle
-
-      // Error/Info fields
+      handle,
       error: mappingError,
       info: mappingInfo,
-
-      // Collect any truly *other* remaining top-level fields
       ...otherTopLevelData
   } = mappedPreviewData && typeof mappedPreviewData === 'object' ? mappedPreviewData : {};
 
-  // --- DEBUGGING --- 
-  
-  // --- END DEBUGGING ---
-
-  // --- Prepare Data Sections ---
-
-  // 1. Basic Info
   const hasBasicInfo = title || status || bodyHtml;
+  
+  const detailsItems = createDefinitionListItems({ vendor, productType, handle });
 
-  // 2. Details
-  const detailsItems = createDescriptionListItems({ vendor, productType, handle });
-
-  // 3. Tags
   const displayTags = useMemo(() => {
       if (Array.isArray(tags)) {
-          return tags.filter(tag => tag && String(tag).trim()); // Filter empty tags
+          return tags.filter(tag => tag && String(tag).trim());
       } else if (typeof tags === 'string' && tags.trim() !== '') {
           return tags.split(',').map(tag => tag.trim()).filter(tag => tag);
       }
       return [];
   }, [tags]);
 
-  // 4. Inventory & Pricing
   const inventoryData = inventoryItem || {};
-  const inventoryPriceItems = createDescriptionListItems({
+  const inventoryPriceItems = createDefinitionListItems({
       price: inventoryData.price,
       compareAtPrice: inventoryData.compareAtPrice,
-      cost: inventoryData.cost, // Added Cost
+      cost: inventoryData.cost,
       sku: inventoryData.sku,
       barcode: inventoryData.barcode,
   });
-  const inventoryStockItems = createDescriptionListItems({
+  const inventoryStockItems = createDefinitionListItems({
       inventoryQuantity: inventoryData.inventoryQuantity,
       inventoryPolicy: inventoryData.inventoryPolicy,
       inventoryManagement: inventoryData.inventoryManagement,
   });
 
-  // 5. Shipping & Weight
-  const shippingWeightItems = createDescriptionListItems({
+  const shippingWeightItems = createDefinitionListItems({
       weight: inventoryData.weight,
       weightUnit: inventoryData.weightUnit,
-      requiresShipping: inventoryData.requiresShipping, // Added Requires Shipping
-      harmonizedSystemCode: inventoryData.harmonizedSystemCode, // Added HS Code
+      requiresShipping: inventoryData.requiresShipping,
+      harmonizedSystemCode: inventoryData.harmonizedSystemCode,
   });
 
-  // 6. Tax
-  const taxItems = createDescriptionListItems({
-      taxable: inventoryData.taxable, // Added Taxable
-      taxCode: inventoryData.taxCode, // Added Tax Code
+  const taxItems = createDefinitionListItems({
+      taxable: inventoryData.taxable,
+      taxCode: inventoryData.taxCode,
   });
 
-  // 7. SEO
   const seoData = seo || {};
-  const seoItems = createDescriptionListItems({
+  const seoItems = createDefinitionListItems({
       title: seoData.title,
       description: seoData.description
   });
 
-  // 8. Metafields (Grouped)
   const groupedMetafields = useMemo(() => {
     if (!metafields || !Array.isArray(metafields) || metafields.length === 0) return {};
     return metafields.reduce((acc, mf) => {
-        // Basic validation of metafield structure
         if (mf && typeof mf === 'object' && mf.key && mf.namespace) {
-            const ns = mf.namespace || 'custom'; // Default namespace if missing
+            const ns = mf.namespace || 'custom'; 
             if (!acc[ns]) {
                 acc[ns] = [];
             }
@@ -182,35 +149,31 @@ function WizardStepPreview({
   }, [metafields]);
   const hasMetafields = Object.keys(groupedMetafields).length > 0;
 
-  // 9. Other Data
-  const otherDataItems = createDescriptionListItems({
-      publishedAt, // Added Published At
-      requiresSellingPlan, // Added Selling Plan
-      templateSuffix, // Added Template Suffix
-      ...otherTopLevelData // Include truly other fields
+  const otherDataItems = createDefinitionListItems({
+      publishedAt,
+      requiresSellingPlan,
+      templateSuffix,
+      ...otherTopLevelData 
   });
 
-  // Determine Badge tone based on status
-  let statusTone;
+  let statusText = status ? String(status).toUpperCase() : 'UNKNOWN';
+  let statusStyle = { padding: '0.1rem 0.4rem', borderRadius: '3px', display: 'inline-block', fontSize: '0.8rem' };
   switch (String(status).toLowerCase()) {
-      case 'active': statusTone = 'success'; break;
-      case 'archived': statusTone = 'critical'; break; // Changed to critical for archived
+      case 'active': statusStyle.backgroundColor = 'lightgreen'; statusStyle.color = 'darkgreen'; break;
+      case 'archived': statusStyle.backgroundColor = 'lightcoral'; statusStyle.color = 'darkred'; break;
       case 'draft':
-      default: statusTone = 'attention'; break;
+      default: statusStyle.backgroundColor = 'lightgoldenrodyellow'; statusStyle.color = 'darkgoldenrod'; break;
   }
 
-  // Determine if there's *any* structured content to display
   const hasDisplayableContent = hasBasicInfo || detailsItems.length > 0 || displayTags.length > 0 ||
                               inventoryPriceItems.length > 0 || inventoryStockItems.length > 0 ||
                               shippingWeightItems.length > 0 || taxItems.length > 0 || seoItems.length > 0 ||
                               hasMetafields || otherDataItems.length > 0;
 
   return (
-    <BlockStack gap="500">
-      <Text variant="headingMd" as="h2">
-        {stepTitle}
-      </Text>
-      <Text as="p" tone="subdued">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <h2>{stepTitle}</h2>
+      <p style={{ color: 'gray'}}>
         Preview the simulated Shopify product data based on your mapping.
         {isArray && totalItems > 0 && (
           ` Showing product ${currentPreviewIndex + 1} of ${totalItems}.`
@@ -221,251 +184,129 @@ function WizardStepPreview({
         {totalItems === 0 && (
           ' No products found in the processed data to preview.'
         )}
-      </Text>
+      </p>
 
-      {/* Add the navigation controls at the top if there are multiple items */}
       {canNavigate && (
-        <Box paddingBlockStart="200" paddingBlockEnd="200">
-          <InlineStack align="center" gap="400">
-            <Text as="span" variant="headingSm" fontWeight="medium">Browse Products:</Text>
-            <ButtonGroup>
-              <Button
-                icon={ChevronLeftIcon}
-                onClick={handlePrevious}
-                disabled={!canGoPrevious}
-                accessibilityLabel="Previous product"
-              >
-                Previous
-              </Button>
-              <Button
-                icon={ChevronRightIcon}
-                iconPosition="end"
-                onClick={handleNext}
-                disabled={!canGoNext}
-                accessibilityLabel="Next product"
-              >
-                Next
-              </Button>
-            </ButtonGroup>
-            {totalItems > 0 && (
-              <Text as="span" tone="subdued">
-                {`Product ${currentPreviewIndex + 1} / ${totalItems}`}
-              </Text>
-            )}
-          </InlineStack>
-        </Box>
-      )}
-
-      <Divider />
-
-      {totalItems > 0 && mappedPreviewData && (
-        // Use padding on the Card itself
-        <Card padding="0">
-            {/* Error/Info Banners - Place *inside* Card but outside sections */}
-            {mappingError && (
-              <Box padding="400" background="bg-surface-critical-subdued" borderBottomWidth="025" borderColor="border">
-                 <Text tone="critical" variant="bodyMd">Error during mapping: {mappingError}</Text>
-              </Box>
-            )}
-            {mappingInfo && !mappingError && (
-                <Box padding="400" background="bg-surface-secondary" borderBottomWidth="025" borderColor="border">
-                    <Text tone="subdued" variant="bodyMd">{mappingInfo}</Text>
-                </Box>
-            )}
-
-            {/* Render Product-like Preview only if no error/info or if content exists */}
-            {(!mappingError && !mappingInfo && hasDisplayableContent) ? (
-                <BlockStack gap="0"> {/* Remove gap here, let Card.Section handle spacing */}
-                    {/* --- Section: Basic Info --- */}
-                    {hasBasicInfo && (
-                        <Box padding="400"> {/* Removed borderBottomWidth */}
-                            <BlockStack gap="200">
-                                <InlineStack gap="200" align="start" blockAlign="center" wrap={false}>
-                                    {title ? (
-                                        <Text variant="headingLg" as="h3">{renderValue(title)}</Text>
-                                    ) : (
-                                        <Text variant="headingLg" as="h3" tone="subdued">_No Title Mapped_</Text>
-                                    )}
-                                    {status && <Badge tone={statusTone}>{renderValue(status)}</Badge>}
-                                </InlineStack>
-                                {bodyHtml ? (
-                                    // Use TextContainer for potentially longer descriptions
-                                    <Text as="p" variant="bodyMd">{renderValue(bodyHtml)}</Text>
-                                ) : (
-                                    <Text as="p" tone="subdued" variant="bodyMd">_No description mapped or available_</Text>
-                                )}
-                            </BlockStack>
-                        </Box>
-                    )}
-
-                    {/* --- Divider if needed --- */}
-                    {hasBasicInfo && (detailsItems.length > 0 || displayTags.length > 0 || inventoryPriceItems.length > 0 || inventoryStockItems.length > 0 || shippingWeightItems.length > 0 || taxItems.length > 0 || seoItems.length > 0 || hasMetafields || otherDataItems.length > 0) && <Divider />}
-
-                    {/* --- Section: Details --- */}
-                    {detailsItems.length > 0 && (
-                        <Box padding="400"> {/* Removed borderBottomWidth */}
-                            <BlockStack gap="200">
-                                <Text variant="headingMd" as="h3">Details</Text>
-                                <DescriptionList items={detailsItems} />
-                            </BlockStack>
-                        </Box>
-                    )}
-
-                    {/* --- Divider if needed --- */}
-                    {detailsItems.length > 0 && (displayTags.length > 0 || inventoryPriceItems.length > 0 || inventoryStockItems.length > 0 || shippingWeightItems.length > 0 || taxItems.length > 0 || seoItems.length > 0 || hasMetafields || otherDataItems.length > 0) && <Divider />}
-
-                    {/* --- Section: Tags --- */}
-                    {displayTags.length > 0 && (
-                        <Box padding="400"> {/* Removed borderBottomWidth */}
-                            <BlockStack gap="200">
-                                <Text variant="headingMd" as="h3">Tags</Text>
-                                <InlineStack gap="200" wrap={true}>
-                                    {displayTags.map((tag, index) => <Tag key={index}>{renderValue(tag)}</Tag>)}
-                                </InlineStack>
-                            </BlockStack>
-                        </Box>
-                    )}
-
-                    {/* --- Divider if needed --- */}
-                    {displayTags.length > 0 && (inventoryPriceItems.length > 0 || inventoryStockItems.length > 0 || shippingWeightItems.length > 0 || taxItems.length > 0 || seoItems.length > 0 || hasMetafields || otherDataItems.length > 0) && <Divider />}
-
-                    {/* --- Section: Pricing & Inventory --- */}
-                    {(inventoryPriceItems.length > 0 || inventoryStockItems.length > 0) && (
-                        <Box padding="400"> {/* Removed borderBottomWidth */}
-                            <BlockStack gap="200">
-                                <Text variant="headingMd" as="h3">Pricing & Inventory</Text>
-                                <BlockStack gap="400">
-                                    {inventoryPriceItems.length > 0 && <DescriptionList items={inventoryPriceItems} />}
-                                    {inventoryStockItems.length > 0 && <DescriptionList items={inventoryStockItems} />}
-                                </BlockStack>
-                            </BlockStack>
-                        </Box>
-                    )}
-
-                    {/* --- Divider if needed --- */}
-                    {(inventoryPriceItems.length > 0 || inventoryStockItems.length > 0) && (shippingWeightItems.length > 0 || taxItems.length > 0 || seoItems.length > 0 || hasMetafields || otherDataItems.length > 0) && <Divider />}
-
-                    {/* --- Section: Shipping & Weight --- */}
-                    {shippingWeightItems.length > 0 && (
-                        <Box padding="400"> {/* Removed borderBottomWidth */}
-                            <BlockStack gap="200">
-                                <Text variant="headingMd" as="h3">Shipping & Weight</Text>
-                                <DescriptionList items={shippingWeightItems} />
-                            </BlockStack>
-                        </Box>
-                    )}
-
-                    {/* --- Divider if needed --- */}
-                    {shippingWeightItems.length > 0 && (taxItems.length > 0 || seoItems.length > 0 || hasMetafields || otherDataItems.length > 0) && <Divider />}
-
-                    {/* --- Section: Tax --- */}
-                    {taxItems.length > 0 && (
-                        <Box padding="400"> {/* Removed borderBottomWidth */}
-                            <BlockStack gap="200">
-                                <Text variant="headingMd" as="h3">Tax</Text>
-                                <DescriptionList items={taxItems} />
-                            </BlockStack>
-                        </Box>
-                    )}
-
-                    {/* --- Divider if needed --- */}
-                    {taxItems.length > 0 && (seoItems.length > 0 || hasMetafields || otherDataItems.length > 0) && <Divider />}
-
-                    {/* --- Section: SEO --- */}
-                    {seoItems.length > 0 && (
-                        <Box padding="400"> {/* Removed borderBottomWidth */}
-                            <BlockStack gap="200">
-                                <Text variant="headingMd" as="h3">Search Engine Listing</Text>
-                                <DescriptionList items={seoItems} />
-                            </BlockStack>
-                        </Box>
-                    )}
-
-                    {/* --- Divider if needed --- */}
-                    {seoItems.length > 0 && (hasMetafields || otherDataItems.length > 0) && <Divider />}
-
-                    {/* --- Section: Metafields --- */}
-                    {hasMetafields && (
-                        <Box padding="400"> {/* Removed borderBottomWidth */}
-                            <BlockStack gap="200">
-                                <Text variant="headingMd" as="h3">Metafields ({metafields.length})</Text>
-                                <BlockStack gap="400">
-                                    {Object.entries(groupedMetafields).map(([namespace, mfs]) => (
-                                        <BlockStack key={namespace} gap="100">
-                                            {/* Use a smaller heading for namespace */}
-                                            <Text variant="headingSm" as="h4">{namespace}</Text>
-                                            {/* Indent the list slightly */}
-                                            <Box paddingInlineStart="200">
-                                                <DescriptionList
-                                                    items={mfs.map((mf, idx) => ({
-                                                        term: mf.key || `field_${idx}`, // Fallback term
-                                                        description: (
-                                                            <BlockStack gap="0">
-                                                                <Text as="span" variant="bodyMd">{renderValue(mf.value)}</Text>
-                                                                {mf.type && (
-                                                                    <Text as="span" tone="subdued" variant="bodySm">({renderValue(mf.type)})</Text>
-                                                                )}
-                                                            </BlockStack>
-                                                        )
-                                                    }))}
-                                                />
-                                            </Box>
-                                        </BlockStack>
-                                    ))}
-                                </BlockStack>
-                            </BlockStack>
-                        </Box>
-                    )}
-
-                    {/* --- Divider if needed --- */}
-                    {hasMetafields && otherDataItems.length > 0 && <Divider />}
-
-                    {/* --- Section: Other Data --- */}
-                    {otherDataItems.length > 0 && (
-                        <Box padding="400"> {/* This box never had a border */}
-                            <BlockStack gap="200">
-                                <Text variant="headingMd" as="h3">Other Data</Text>
-                                <DescriptionList items={otherDataItems} />
-                            </BlockStack>
-                        </Box>
-                    )}
-                </BlockStack>
-            ) : (
-                 /* Fallback message if no displayable content AND no error/info */
-                 !mappingError && !mappingInfo && (
-                     <Box padding="400">
-                         <Text tone="subdued" alignment='center'>No mappable data fields found or mapped for this item.</Text>
-                     </Box>
-                )
-            )}
-        </Card>
-      )}
-
-      {/* Keep the bottom navigation buttons for convenience */}
-      {canNavigate && (
-        <InlineStack align="center" gap="400">
-          <ButtonGroup>
-            <Button
-              icon={ChevronLeftIcon}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderBottom: '1px solid #eee', paddingBottom: '1rem' }}>
+          <span style={{ fontWeight: 'bold' }}>Browse Products:</span>
+          <div>
+            <button
               onClick={handlePrevious}
               disabled={!canGoPrevious}
-              accessibilityLabel="Previous product"
-            />
-            <Button
-              icon={ChevronRightIcon}
+              style={{ marginRight: '0.5rem' }}
+            >
+              Previous
+            </button>
+            <button
               onClick={handleNext}
               disabled={!canGoNext}
-              accessibilityLabel="Next product"
-            />
-          </ButtonGroup>
+            >
+              Next
+            </button>
+          </div>
           {totalItems > 0 && (
-            <Text as="span" tone="subdued">
-              {`Product ${currentPreviewIndex + 1} / ${totalItems}`}
-            </Text>
+            <span style={{ fontSize: '0.9rem', marginLeft: 'auto' }}>{`${currentPreviewIndex + 1} / ${totalItems}`}</span>
           )}
-        </InlineStack>
+        </div>
       )}
-    </BlockStack>
+
+      {mappingError && <div style={{ color: 'red', border: '1px solid red', padding: '0.5rem'}}>Error: {mappingError}</div>}
+      {mappingInfo && !mappingError && <div style={{ color: 'blue', border: '1px solid blue', padding: '0.5rem'}}>Info: {mappingInfo}</div>}
+      
+      {!mappingError && !mappingInfo && (
+        <div style={{ border: '1px solid #ccc', padding: '1rem' }}>
+            {hasBasicInfo && (
+                <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #eee'}}>
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        {title && <h3 style={{ margin: '0 0 0.5rem 0' }}>{renderValue(title)}</h3>}
+                        {status && <span style={statusStyle}>{statusText}</span>}
+                   </div>
+                   {bodyHtml && (
+                       <div style={{ marginTop: '0.5rem' }}>
+                           <h4>Description (HTML)</h4>
+                           <div dangerouslySetInnerHTML={{ __html: bodyHtml }} style={{ border: '1px dashed #eee', padding: '0.5rem', maxHeight: '200px', overflowY: 'auto' }} />
+                       </div>
+                   )}
+                </div>
+            )}
+
+            {detailsItems.length > 0 && (
+                <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #eee'}}>
+                    <h4>Details</h4>
+                    <dl style={{ margin: 0, paddingLeft: '1rem' }}>{detailsItems}</dl>
+                </div>
+            )}
+
+            {displayTags.length > 0 && (
+                <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #eee'}}>
+                    <h4>Tags</h4>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        {displayTags.map((tag, index) => <span key={index} style={{ border: '1px solid #ddd', padding: '0.2rem 0.5rem', borderRadius: '3px', backgroundColor: '#f9f9f9'}}>{renderValue(tag)}</span>)}
+                    </div>
+                </div>
+            )}
+
+            {(inventoryPriceItems.length > 0 || inventoryStockItems.length > 0) && (
+                <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #eee'}}>
+                    <h4>Pricing & Inventory</h4>
+                    {inventoryPriceItems.length > 0 && <dl style={{ margin: '0 0 0.5rem 1rem', padding: 0 }}>{inventoryPriceItems}</dl>}
+                    {inventoryStockItems.length > 0 && <dl style={{ margin: '0 0 0.5rem 1rem', padding: 0 }}>{inventoryStockItems}</dl>}
+                </div>
+            )}
+
+            {shippingWeightItems.length > 0 && (
+                <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #eee'}}>
+                    <h4>Shipping & Weight</h4>
+                    <dl style={{ margin: 0, paddingLeft: '1rem' }}>{shippingWeightItems}</dl>
+                </div>
+            )}
+
+            {taxItems.length > 0 && (
+                 <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #eee'}}>
+                    <h4>Tax</h4>
+                    <dl style={{ margin: 0, paddingLeft: '1rem' }}>{taxItems}</dl>
+                </div>
+            )}
+
+            {seoItems.length > 0 && (
+                <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #eee'}}>
+                    <h4>SEO</h4>
+                    <dl style={{ margin: 0, paddingLeft: '1rem' }}>{seoItems}</dl>
+                </div>
+            )}
+
+            {hasMetafields && (
+                <div style={{ marginBottom: '1rem', paddingBottom: '1rem', borderBottom: '1px solid #eee'}}>
+                    <h4>Metafields</h4>
+                    {Object.entries(groupedMetafields).map(([namespace, fields]) => (
+                        <div key={namespace} style={{ marginLeft: '1rem', marginBottom: '0.5rem'}}>
+                            <h5>Namespace: {namespace}</h5>
+                            <dl style={{ margin: 0, paddingLeft: '1rem'}}>
+                                {fields.map(mf => (
+                                    <React.Fragment key={`${mf.namespace}-${mf.key}`}>
+                                        <dt>{mf.key}</dt>
+                                        <dd>{renderValue(mf.value)}</dd>
+                                    </React.Fragment>
+                                ))}
+                            </dl>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {otherDataItems.length > 0 && (
+                 <div>
+                    <h4>Other Data</h4>
+                    <dl style={{ margin: 0, paddingLeft: '1rem' }}>{otherDataItems}</dl>
+                </div>
+            )}
+
+            {!hasDisplayableContent && (
+                <p style={{ fontStyle: 'italic', color: 'gray'}}>No mapped data available to preview for this item.</p>
+            )}
+        </div>
+      )}
+    </div>
   );
 }
 

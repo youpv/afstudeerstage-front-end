@@ -1,11 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  Page,
-  Layout,
-  Card,
-  Box,
-} from '@shopify/polaris'
 import { useMutation } from '@tanstack/react-query'
 
 // Import sub-components
@@ -280,11 +274,12 @@ function IntegrationWizard({ onFinish, initialData = null }) {
     mutationFn: testFtpConnection,
     onSuccess: () => {
       // If test is successful, trigger the download
+      const isMock = ftpHost && ftpHost.trim().toLowerCase() === 'mock';
       const currentCredentials = {
         host: ftpHost,
         port: ftpPort || 21,
-        user: ftpUser,
-        password: ftpPassword,
+        user: isMock ? 'mock' : ftpUser,
+        password: isMock ? 'mock' : ftpPassword,
       };
       downloadMutation.mutate({ credentials: currentCredentials, filePath });
     },
@@ -626,16 +621,35 @@ function IntegrationWizard({ onFinish, initialData = null }) {
     testConnectionMutation.mutate(currentCredentials);
   };
 
+  // Helper to detect the specific mock connection mode
+  const isSpecificMockConnection = ftpHost && ftpHost.trim().toLowerCase() === 'ftp.fightclub.nl'
+    && ftpUser && ftpUser === 'Fightclub'
+    && ftpPassword && ftpPassword === 'Pixels';
+
   // Basic validation for enabling next/finish
   const isNextDisabled = (() => {
     if (step === 0 && !name) return true;
-    // Enable next on step 1 if connection test succeeded OR if download succeeded (meaning test implicitly succeeded)
-    if (step === 1 && connectionType === 'ftp' && (!ftpHost || !ftpUser || !ftpPassword || !filePath || (!testConnectionMutation.isSuccess && !downloadMutation.isSuccess))) return true;
-    // Only check for the required title mapping on mapping step
+
+    // --- Step 1 (Connection details) ---
+    if (step === 1 && connectionType === 'ftp') {
+      // Requirements differ for mock vs real connections
+      const baseRequirementsMet = !!ftpHost; // Host is always required
+
+      const credentialsRequirementsMet = isSpecificMockConnection
+        ? true // Skip credential checks for mock
+        : !!ftpUser && !!ftpPassword && !!filePath;
+
+      const connectionSucceeded = testConnectionMutation.isSuccess || downloadMutation.isSuccess;
+
+      if (!baseRequirementsMet || !credentialsRequirementsMet || !connectionSucceeded) return true;
+    }
+
+    // --- Step 2 (Mapping) ---
     if (step === 2 && (!titleKey || mappingOptions.length === 0)) return true;
-    // Preview step (step 3) is always enabled if we got past mapping
-    // Schedule step (step 4) check
-    if (step === 4 && !frequency) return true; // Adjusted index
+
+    // --- Step 4 (Schedule) ---
+    if (step === 4 && !frequency) return true;
+
     return false;
   })();
 
@@ -902,33 +916,38 @@ function IntegrationWizard({ onFinish, initialData = null }) {
     }
   };
 
+  const pageTitle = initialData ? 'Edit Integration' : 'Create New Integration'
+
   return (
-    <Page title={initialData ? 'Edit Integration' : 'Create New Integration'} subtitle="Set up a connection to sync data with Shopify">
-      <Layout>
-        <Layout.Section>
-          <WizardStepsIndicator steps={steps} currentStep={step} />
-        </Layout.Section>
-
-        <Layout.Section>
-          <Card>{renderStepContent()}</Card>
-        </Layout.Section>
-
-        <Layout.Section>
-          <Box paddingBlockEnd="400">
-            <WizardActions
-              onBack={handleBack}
-              onNext={handleNext}
-              onSubmit={handleSubmit}
-              currentStep={step}
-              totalSteps={steps.length}
-              isNextDisabled={isNextDisabled}
-              isLoading={isConnectionStepLoading}
-              isEditing={!!initialData} // Pass whether we are editing
-            />
-          </Box>
-        </Layout.Section>
-      </Layout>
-    </Page>
+    <div>
+      <h1>{pageTitle}</h1>
+      <div>
+        <div>
+          <div>
+            <div>
+              <WizardStepsIndicator steps={steps} currentStep={step} />
+            </div>
+          </div>
+        </div>
+        <div>
+          <div>
+            {renderStepContent()}
+            <div>
+              <WizardActions
+                onBack={handleBack}
+                onNext={handleNext}
+                onSubmit={handleSubmit}
+                currentStep={step}
+                totalSteps={steps.length}
+                isNextDisabled={isNextDisabled}
+                isLoading={isConnectionStepLoading}
+                isEditing={!!initialData}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 

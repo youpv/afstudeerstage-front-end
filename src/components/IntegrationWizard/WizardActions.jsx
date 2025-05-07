@@ -1,5 +1,3 @@
-import { Button, InlineStack } from '@shopify/polaris'
-
 /**
  * Renders the Back/Next/Finish action buttons for the wizard.
  * @param {{
@@ -9,7 +7,8 @@ import { Button, InlineStack } from '@shopify/polaris'
  *   currentStep: number,
  *   totalSteps: number,
  *   isNextDisabled: boolean,
- *   isLoading: boolean
+ *   isLoading: boolean,
+ *   isEditing: boolean
  * }} props
  */
 function WizardActions({
@@ -20,33 +19,29 @@ function WizardActions({
   totalSteps,
   isNextDisabled,
   isLoading,
-  isEditing // New prop to change the finish button text
+  isEditing
 }) {
   return (
-    <InlineStack align="end" gap="200">
-      <Button onClick={onBack} disabled={currentStep === 0 || isLoading}>
+    <div>
+      <button onClick={onBack} disabled={currentStep === 0 || isLoading}>
         Back
-      </Button>
+      </button>
       {currentStep === totalSteps - 1 ? (
-        <Button
-          variant="primary"
+        <button
           onClick={onSubmit}
           disabled={isNextDisabled || isLoading}
-          loading={isLoading} // Ensure loading state is passed here too
         >
-          {isEditing ? 'Finish & Save Integration' : 'Finish & Create Integration'}
-        </Button>
+          {isLoading ? 'Loading...' : (isEditing ? 'Finish & Save Integration' : 'Finish & Create Integration')}
+        </button>
       ) : (
-        <Button
-          variant="primary"
+        <button
           onClick={onNext}
           disabled={isNextDisabled || isLoading}
-          loading={isLoading} // And here
         >
-          Next
-        </Button>
+          {isLoading ? 'Loading...' : 'Next'}
+        </button>
       )}
-    </InlineStack>
+    </div>
   )
 }
 
