@@ -10,12 +10,11 @@ import {
   ActionList,
   Tooltip,
   InlineGrid,
-  Badge,
-  Scrollable,
   Box,
   Icon,
   Card,
   TextField,
+  InlineError,
 } from '@shopify/polaris'
 import {
   PlusCircleIcon,
@@ -23,8 +22,10 @@ import {
   CheckCircleIcon,
   InfoIcon,
   DeleteIcon,
+  WandIcon,
 } from '@shopify/polaris-icons'
 import { useState, useCallback, useMemo, useEffect } from 'react'
+import { suggestMappings, DEFAULT_MAPPING_SYSTEM_PROMPT } from '../../services/openai-client'
 
 // Helper function for truncation
 const truncateString = (str, num) => {
@@ -47,8 +48,20 @@ const METAFIELD_TYPES = [
   { label: 'URL', value: 'url' },
   { label: 'Date', value: 'date' },
   { label: 'Date & Time', value: 'date_time' },
+  { label: 'Color', value: 'color' },
+  { label: 'Weight', value: 'weight' },
+  { label: 'Volume', value: 'volume' },
+  { label: 'Dimension', value: 'dimension' },
+  { label: 'Rating', value: 'rating' },
   { label: 'List: Single line text', value: 'list.single_line_text_field' },
-  // Add more list types if needed (e.g., list.number_integer)
+  { label: 'List: Multi line text', value: 'list.multi_line_text_field' },
+  { label: 'List: Integer', value: 'list.number_integer' },
+  { label: 'List: Decimal', value: 'list.number_decimal' },
+  { label: 'List: Boolean', value: 'list.boolean' },
+  { label: 'List: URL', value: 'list.url' },
+  { label: 'List: Date', value: 'list.date' },
+  { label: 'List: Date & Time', value: 'list.date_time' },
+  { label: 'List: JSON String', value: 'list.json_string' },
 ];
 
 // --- Helper to get keys from the first object in an array ---
@@ -85,7 +98,7 @@ const isArrayOfObjects = (data) => {
  *  // Other necessary props
  *  mappingOptions: {label: string, value: string}[],
  *  remoteData: any // Used to check if data was fetched
- *  processedPreviewData: object | null // The actual data object for value preview
+ *  processedPreviewData: object | null // The actual data object for value preview & AI mapping
  * }} props
  */
 function WizardStepMapping({
@@ -125,6 +138,10 @@ function WizardStepMapping({
   const [newArrayValueSource, setNewArrayValueSource] = useState('');
   const [arrayObjectKeys, setArrayObjectKeys] = useState([]); // Options for key/value source dropdowns
 
+  // --- AI Mapping State ---
+  const [isAiMappingLoading, setIsAiMappingLoading] = useState(false);
+  const [aiMappingError, setAiMappingError] = useState('');
+
   // --- Effect to check selected source data type ---
   useEffect(() => {
     if (newMetafieldSourceKey && processedPreviewData) {
@@ -163,51 +180,138 @@ function WizardStepMapping({
 
   // --- Optional Field Configuration ---
   const allOptionalFieldsConfig = useMemo(() => {
+    const config = {};
     // Helper to create setter for a specific optional field key
-    const createSetter = (fieldConst) => (value) => {
-      setOptionalFieldKeys(prev => ({ ...prev, [fieldConst]: value }));
+    const createSetter = (fieldConstName) => (value) => {
+      // Use the constant name (e.g., FIELD_VENDOR) as the key
+      setOptionalFieldKeys(prev => ({ ...prev, [fieldConstName]: value }));
     };
 
-    // Define labels and help text for each field
-    return {
-      // [fieldConstants.FIELD_ID]: { label: 'Product ID (for updates)', setter: createSetter(fieldConstants.FIELD_ID), id: 'idKey', helpText: 'Map to the existing Shopify Product ID (GID) if updating.' }, // Removed
-      [fieldConstants.FIELD_DESCRIPTION_HTML]: { label: 'Description (HTML)', setter: createSetter(fieldConstants.FIELD_DESCRIPTION_HTML), id: 'descriptionHtmlKey', helpText: 'Map to the product description (HTML is supported).' },
-      [fieldConstants.FIELD_VENDOR]: { label: 'Vendor', setter: createSetter(fieldConstants.FIELD_VENDOR), id: 'vendorKey', helpText: 'Map to the brand or vendor name.' },
-      [fieldConstants.FIELD_HANDLE]: { label: 'Handle', setter: createSetter(fieldConstants.FIELD_HANDLE), id: 'handleKey', helpText: 'Map to the unique URL handle (e.g., product-name).' },
-      [fieldConstants.FIELD_PRODUCT_TYPE]: { label: 'Product Type', setter: createSetter(fieldConstants.FIELD_PRODUCT_TYPE), id: 'productTypeKey', helpText: 'Map to product type (e.g., T-Shirt, Mug).' },
-      [fieldConstants.FIELD_TAGS]: { label: 'Tags', setter: createSetter(fieldConstants.FIELD_TAGS), id: 'tagsKey', helpText: 'Map to a comma-separated list or array of tags.' },
-      [fieldConstants.FIELD_STATUS]: { label: 'Status', setter: createSetter(fieldConstants.FIELD_STATUS), id: 'statusKey', helpText: 'Map to product status (ACTIVE, ARCHIVED, DRAFT).' },
-      [fieldConstants.FIELD_SEO_TITLE]: { label: 'SEO Title', setter: createSetter(fieldConstants.FIELD_SEO_TITLE), id: 'seoTitleKey', helpText: 'Map to the search engine title.' },
-      [fieldConstants.FIELD_SEO_DESCRIPTION]: { label: 'SEO Description', setter: createSetter(fieldConstants.FIELD_SEO_DESCRIPTION), id: 'seoDescriptionKey', helpText: 'Map to the search engine description.' },
-      [fieldConstants.FIELD_PUBLISHED_AT]: { label: 'Published At', setter: createSetter(fieldConstants.FIELD_PUBLISHED_AT), id: 'publishedAtKey', helpText: 'Map to the publication date/time (ISO 8601 format).' },
-      [fieldConstants.FIELD_REQUIRES_SELLING_PLAN]: { label: 'Requires Selling Plan', setter: createSetter(fieldConstants.FIELD_REQUIRES_SELLING_PLAN), id: 'requiresSellingPlanKey', helpText: 'Map to a boolean (true/false) indicating if a selling plan is required.' },
-      [fieldConstants.FIELD_TEMPLATE_SUFFIX]: { label: 'Template Suffix', setter: createSetter(fieldConstants.FIELD_TEMPLATE_SUFFIX), id: 'templateSuffixKey', helpText: 'Map to the theme template suffix.' },
+    // Define labels and help text using the constant names as keys
+    // Iterate over the fieldConstants prop passed from the parent
+    for (const fieldConstName in fieldConstants) {
+        if (Object.prototype.hasOwnProperty.call(fieldConstants, fieldConstName)) {
+            const fieldValue = fieldConstants[fieldConstName]; // e.g., 'vendor'
+            let label = 'Unknown Field';
+            let helpText = 'Map this field.';
+            const id = `${fieldValue}Key`; // Use value for ID generation for stability
 
-      // --- Fields previously under Variant (now flat) ---
-      [fieldConstants.FIELD_SKU]: { label: 'SKU', setter: createSetter(fieldConstants.FIELD_SKU), id: 'skuKey', helpText: 'Map to the Stock Keeping Unit.' },
-      [fieldConstants.FIELD_BARCODE]: { label: 'Barcode', setter: createSetter(fieldConstants.FIELD_BARCODE), id: 'barcodeKey', helpText: 'Map to the barcode (UPC, EAN, ISBN).' },
-      [fieldConstants.FIELD_PRICE]: { label: 'Price', setter: createSetter(fieldConstants.FIELD_PRICE), id: 'priceKey', helpText: 'Map to the selling price.' },
-      [fieldConstants.FIELD_COMPARE_AT_PRICE]: { label: 'Compare At Price', setter: createSetter(fieldConstants.FIELD_COMPARE_AT_PRICE), id: 'compareAtPriceKey', helpText: 'Map to the original price before discount.' },
-      [fieldConstants.FIELD_WEIGHT]: { label: 'Weight', setter: createSetter(fieldConstants.FIELD_WEIGHT), id: 'weightKey', helpText: 'Map to the product weight (numeric value).' },
-      [fieldConstants.FIELD_WEIGHT_UNIT]: { label: 'Weight Unit', setter: createSetter(fieldConstants.FIELD_WEIGHT_UNIT), id: 'weightUnitKey', helpText: 'Map to the weight unit (KILOGRAMS, GRAMS, POUNDS, OUNCES).' },
-      [fieldConstants.FIELD_INVENTORY_POLICY]: { label: 'Inventory Policy', setter: createSetter(fieldConstants.FIELD_INVENTORY_POLICY), id: 'inventoryPolicyKey', helpText: 'Map to DENY or CONTINUE selling when out of stock.' },
-      [fieldConstants.FIELD_INVENTORY_QUANTITY]: { label: 'Inventory Quantity', setter: createSetter(fieldConstants.FIELD_INVENTORY_QUANTITY), id: 'inventoryQuantityKey', helpText: 'Map to the available stock quantity.' },
-      [fieldConstants.FIELD_INVENTORY_MANAGEMENT]: { label: 'Inventory Management', setter: createSetter(fieldConstants.FIELD_INVENTORY_MANAGEMENT), id: 'inventoryManagementKey', helpText: 'Map to SHOPIFY, NOT_MANAGED, or FULFILLMENT_SERVICE.' },
-      [fieldConstants.FIELD_TAXABLE]: { label: 'Taxable', setter: createSetter(fieldConstants.FIELD_TAXABLE), id: 'taxableKey', helpText: 'Map to a boolean (true/false) indicating if the product is taxable.' },
-      [fieldConstants.FIELD_TAX_CODE]: { label: 'Tax Code', setter: createSetter(fieldConstants.FIELD_TAX_CODE), id: 'taxCodeKey', helpText: 'Map to a tax code (e.g., for Avalara).' },
-      [fieldConstants.FIELD_HARMONIZED_SYSTEM_CODE]: { label: 'HS Code', setter: createSetter(fieldConstants.FIELD_HARMONIZED_SYSTEM_CODE), id: 'harmonizedSystemCodeKey', helpText: 'Map to the Harmonized System code for customs.' },
-      [fieldConstants.FIELD_REQUIRES_SHIPPING]: { label: 'Requires Shipping', setter: createSetter(fieldConstants.FIELD_REQUIRES_SHIPPING), id: 'requiresShippingKey', helpText: 'Map to a boolean (true/false) indicating if shipping is required.' },
-      [fieldConstants.FIELD_COST]: { label: 'Cost of Goods', setter: createSetter(fieldConstants.FIELD_COST), id: 'costKey', helpText: 'Map to the cost of the item (inventoryItem.cost).' },
+            // Assign label and helpText based on the constant name
+            // This switch statement maps constant names to UI text
+            switch (fieldConstName) {
+                case 'FIELD_DESCRIPTION_HTML':
+                    label = 'Description (HTML)';
+                    helpText = 'Map to the product description (HTML is supported).';
+                    break;
+                case 'FIELD_VENDOR':
+                    label = 'Vendor';
+                    helpText = 'Map to the brand or vendor name.';
+                    break;
+                case 'FIELD_HANDLE':
+                    label = 'Handle';
+                    helpText = 'Map to the unique URL handle (e.g., product-name).';
+                    break;
+                case 'FIELD_PRODUCT_TYPE':
+                    label = 'Product Type';
+                    helpText = 'Map to product type (e.g., T-Shirt, Mug).';
+                    break;
+                case 'FIELD_TAGS':
+                    label = 'Tags';
+                    helpText = 'Map to a comma-separated list or array of tags.';
+                    break;
+                case 'FIELD_STATUS':
+                    label = 'Status';
+                    helpText = 'Map to product status (ACTIVE, ARCHIVED, DRAFT).';
+                    break;
+                case 'FIELD_SEO_TITLE':
+                    label = 'SEO Title';
+                    helpText = 'Map to the search engine title.';
+                    break;
+                case 'FIELD_SEO_DESCRIPTION':
+                    label = 'SEO Description';
+                    helpText = 'Map to the search engine description.';
+                    break;
+                case 'FIELD_PUBLISHED_AT':
+                    label = 'Published At';
+                    helpText = 'Map to the publication date/time (ISO 8601 format).';
+                    break;
+                case 'FIELD_REQUIRES_SELLING_PLAN':
+                    label = 'Requires Selling Plan';
+                    helpText = 'Map to a boolean (true/false) indicating if a selling plan is required.';
+                    break;
+                case 'FIELD_TEMPLATE_SUFFIX':
+                    label = 'Template Suffix';
+                    helpText = 'Map to the theme template suffix.';
+                    break;
+                case 'FIELD_SKU':
+                    label = 'SKU';
+                    helpText = 'Map to the Stock Keeping Unit.';
+                    break;
+                case 'FIELD_BARCODE':
+                    label = 'Barcode';
+                    helpText = 'Map to the barcode (UPC, EAN, ISBN).';
+                    break;
+                case 'FIELD_PRICE':
+                    label = 'Price';
+                    helpText = 'Map to the selling price.';
+                    break;
+                case 'FIELD_COMPARE_AT_PRICE':
+                    label = 'Compare At Price';
+                    helpText = 'Map to the original price before discount.';
+                    break;
+                case 'FIELD_WEIGHT':
+                    label = 'Weight';
+                    helpText = 'Map to the product weight (numeric value).';
+                    break;
+                case 'FIELD_WEIGHT_UNIT':
+                    label = 'Weight Unit';
+                    helpText = 'Map to the weight unit (KILOGRAMS, GRAMS, POUNDS, OUNCES).';
+                    break;
+                case 'FIELD_INVENTORY_POLICY':
+                    label = 'Inventory Policy';
+                    helpText = 'Map to DENY or CONTINUE selling when out of stock.';
+                    break;
+                case 'FIELD_INVENTORY_QUANTITY':
+                    label = 'Inventory Quantity';
+                    helpText = 'Map to the available stock quantity.';
+                    break;
+                case 'FIELD_INVENTORY_MANAGEMENT':
+                    label = 'Inventory Management';
+                    helpText = 'Map to SHOPIFY, NOT_MANAGED, or FULFILLMENT_SERVICE.';
+                    break;
+                case 'FIELD_TAXABLE':
+                    label = 'Taxable';
+                    helpText = 'Map to a boolean (true/false) indicating if the product is taxable.';
+                    break;
+                case 'FIELD_TAX_CODE':
+                    label = 'Tax Code';
+                    helpText = 'Map to a tax code (e.g., for Avalara).';
+                    break;
+                case 'FIELD_HARMONIZED_SYSTEM_CODE':
+                    label = 'HS Code';
+                    helpText = 'Map to the Harmonized System code for customs.';
+                    break;
+                case 'FIELD_REQUIRES_SHIPPING':
+                    label = 'Requires Shipping';
+                    helpText = 'Map to a boolean (true/false) indicating if shipping is required.';
+                    break;
+                case 'FIELD_COST':
+                    label = 'Cost of Goods';
+                    helpText = 'Map to the cost of the item (inventoryItem.cost).';
+                    break;
+                // Add other cases as needed
+            }
 
-      // --- Removed List Fields ---
-      // [fieldConstants.FIELD_PRODUCT_OPTIONS]: { label: 'Product Options (List)', setter: createSetter(fieldConstants.FIELD_PRODUCT_OPTIONS), id: 'productOptionsKey', helpText: 'Map to the field containing the list of product options.' },
-      // [fieldConstants.FIELD_VARIANTS]: { label: 'Variants (List)', setter: createSetter(fieldConstants.FIELD_VARIANTS), id: 'variantsKey', helpText: 'Map to the field containing the list of product variants.' },
-      // [fieldConstants.FIELD_METAFIELDS]: { label: 'Metafields (List)', setter: createSetter(fieldConstants.FIELD_METAFIELDS), id: 'metafieldsKey', helpText: 'Map to the field containing the list of metafields.' },
-      // [fieldConstants.FIELD_IMAGES]: { label: 'Images (List)', setter: createSetter(fieldConstants.FIELD_IMAGES), id: 'imagesKey', helpText: 'Map to the field containing the list of product images.' },
-      // [fieldConstants.FIELD_FILES]: { label: 'Files (List)', setter: createSetter(fieldConstants.FIELD_FILES), id: 'filesKey', helpText: 'Map to the field containing the list of associated files.' },
-      // [fieldConstants.FIELD_COLLECTIONS_TO_JOIN]: { label: 'Collections to Join (List)', setter: createSetter(fieldConstants.FIELD_COLLECTIONS_TO_JOIN), id: 'collectionsToJoinKey', helpText: 'Map to a list of Collection IDs to add the product to.' },
-      // [fieldConstants.FIELD_COLLECTIONS_TO_LEAVE]: { label: 'Collections to Leave (List)', setter: createSetter(fieldConstants.FIELD_COLLECTIONS_TO_LEAVE), id: 'collectionsToLeaveKey', helpText: 'Map to a list of Collection IDs to remove the product from.' }, // Removed
-    };
+            // Use the constant name (e.g., FIELD_VENDOR) as the key for the config object
+            config[fieldConstName] = {
+                label: label,
+                setter: createSetter(fieldConstName), // Pass the constant name to the setter
+                id: id,
+                helpText: helpText,
+            };
+        }
+    }
+    return config;
   }, [fieldConstants, setOptionalFieldKeys]);
 
   // --- Field Add/Remove Logic (Optional Fields) ---
@@ -296,6 +400,168 @@ function WizardStepMapping({
     setMetafieldMappings(prev => prev.filter(mapping => mapping.id !== idToRemove));
   }, [setMetafieldMappings]);
 
+  // --- AI Mapping Logic ---
+  const handleAiMapClick = useCallback(async () => {
+    setIsAiMappingLoading(true);
+    setAiMappingError('');
+
+    if (!processedPreviewData) {
+      setAiMappingError("Cannot run AI mapping without fetched and processed data.");
+      setIsAiMappingLoading(false);
+      return;
+    }
+
+    // Prepare the system prompt by injecting the actual field constants
+    const fieldConstantsString = Object.entries(fieldConstants)
+        .map(([key, value]) => `* ${value} (${key})`) // Show constant name and its actual value
+        .join('\n');
+    const systemPrompt = DEFAULT_MAPPING_SYSTEM_PROMPT.replace(
+        '{/* We will inject the actual constants here */}',
+        fieldConstantsString
+    );
+
+    
+
+    try {
+      const suggested = await suggestMappings(processedPreviewData, systemPrompt);
+
+      
+      
+      // Get list of available source keys for validation
+      const availableSourceKeys = mappingOptions.map(opt => opt.value);
+      
+
+      // --- Apply Suggestions (Basic Implementation - Overwrites existing) ---
+      // Validate response structure (add more robust validation as needed)
+      if (!suggested || typeof suggested !== 'object') {
+        throw new Error("AI response was not a valid object.");
+      }
+
+      // 1. Apply Title Key
+      if (suggested.titleKey && typeof suggested.titleKey === 'string') {
+        // Check if the suggested key exists in mappingOptions
+        if (availableSourceKeys.includes(suggested.titleKey)) {
+          setTitleKey(suggested.titleKey);
+          
+        } else {
+          console.warn(`AI suggested titleKey '${suggested.titleKey}' not found in available options.`);
+        }
+      } else {
+        console.warn("AI did not suggest a valid titleKey.");
+        // Optional: Keep existing titleKey or clear it?
+      }
+
+      // 2. Apply Optional Fields
+      const newOptionalKeys = {};
+      const newActiveFields = [];
+      
+      if (suggested.optionalFieldKeys && typeof suggested.optionalFieldKeys === 'object') {
+        // Log all the optionalFieldKeys suggested by AI
+        
+        
+        // Log field constants for debugging
+        
+        
+        Object.entries(suggested.optionalFieldKeys).forEach(([fieldConstantValue, sourceKey]) => {
+          // fieldConstantValue should be the constant name like 'FIELD_SKU'
+          // sourceKey should be the key from the source data like 'sku'
+
+          // For debugging, log each field mapping attempt
+          
+          // Check if the key suggested by AI ('fieldConstantValue') is a valid key in our fieldConstants prop
+          const isValidConstantKey = Object.prototype.hasOwnProperty.call(fieldConstants, fieldConstantValue);
+          const isValidSourceKey = typeof sourceKey === 'string' && availableSourceKeys.includes(sourceKey);
+
+          
+          
+
+          // Check if the constant key is valid AND the source key exists in the data
+          if (isValidConstantKey && isValidSourceKey) {
+            // Use fieldConstantValue directly as it IS the correct internal key
+            newOptionalKeys[fieldConstantValue] = sourceKey;
+            newActiveFields.push(fieldConstantValue);
+            
+          } else {
+            console.warn(`AI suggested invalid or non-existent mapping for optional field '${fieldConstantValue}' to source key '${sourceKey}'. Constant valid: ${isValidConstantKey}, Source valid: ${isValidSourceKey}`);
+          }
+        });
+      }
+      
+      // Log what we're actually setting for optional fields
+      
+      
+      
+      setOptionalFieldKeys(prev => ({ ...prev, ...newOptionalKeys })); // Merge suggestions with existing
+      setActiveOptionalFields(prev => [...new Set([...prev, ...newActiveFields])]); // Add newly activated fields
+
+      // 3. Apply Metafield Mappings (Overwrite existing for simplicity first)
+      if (Array.isArray(suggested.metafieldMappings)) {
+        const validMetafieldMappings = suggested.metafieldMappings
+          .map((mf, index) => ({ ...mf, id: `ai-${Date.now()}-${index}` })) // Assign unique IDs
+          .filter(mf => {
+            // Basic validation: check required fields based on type
+            if (!mf.mappingType || !mf.sourceKey || !mf.metafieldNamespace || !mf.metafieldType) {
+              console.warn(`Invalid metafield mapping: missing required fields`, mf);
+              return false;
+            }
+            
+            if (!availableSourceKeys.includes(mf.sourceKey)) {
+                console.warn(`AI suggested metafield sourceKey '${mf.sourceKey}' not found in available options.`);
+                return false; // Invalid source key
+            }
+            
+            if (mf.mappingType === 'single' && !mf.metafieldKey) {
+              console.warn(`Invalid single metafield mapping: missing metafieldKey`, mf);
+              return false;
+            }
+            
+            if (mf.mappingType === 'dynamic_from_array' && (!mf.arrayKeySource || !mf.arrayValueSource)) {
+              console.warn(`Invalid dynamic metafield mapping: missing arrayKeySource or arrayValueSource`, mf);
+              return false;
+            }
+            
+            // Extra validation: for dynamic mappings, check if source data is actually an array of objects
+            if (mf.mappingType === 'dynamic_from_array') {
+              const sourceData = processedPreviewData[mf.sourceKey];
+              if (!isArrayOfObjects(sourceData)) {
+                console.warn(`Invalid dynamic metafield mapping: source is not an array of objects`, mf);
+                return false;
+              }
+              
+              // Check if array key/value sources exist in the array objects
+              if (sourceData.length > 0) {
+                const firstItem = sourceData[0];
+                if (!Object.prototype.hasOwnProperty.call(firstItem, mf.arrayKeySource)) {
+                  console.warn(`Invalid dynamic mapping: arrayKeySource '${mf.arrayKeySource}' not found in array objects`, mf);
+                  return false;
+                }
+                if (!Object.prototype.hasOwnProperty.call(firstItem, mf.arrayValueSource)) {
+                  console.warn(`Invalid dynamic mapping: arrayValueSource '${mf.arrayValueSource}' not found in array objects`, mf);
+                  return false;
+                }
+              }
+            }
+            
+            
+            return true;
+          });
+        
+        
+        setMetafieldMappings(validMetafieldMappings);
+      } else {
+         setMetafieldMappings([]); // Clear if AI didn't provide valid array
+      }
+
+      // --- End Apply Suggestions ---
+
+    } catch (error) {
+      console.error("AI Mapping Error:", error);
+      setAiMappingError(`AI mapping failed: ${error.message}`);
+    } finally {
+      setIsAiMappingLoading(false);
+    }
+  }, [processedPreviewData, fieldConstants, setTitleKey, setOptionalFieldKeys, setActiveOptionalFields, setMetafieldMappings, mappingOptions]);
+
   // --- Calculate currently used source keys (including metafields) ---
   const mappedSourceKeys = useMemo(() => {
     const keys = new Set();
@@ -357,6 +623,31 @@ function WizardStepMapping({
             <InlineGrid columns={{ xs: 1, md: '2fr 1fr' }} gap="400">
               {/* Left Column: Mapping Selects & Metafields */}
               <BlockStack gap="500"> {/* Increased gap */} 
+                  {/* === AI Mapping Action === */}
+                  <Card roundedAbove="sm">
+                     <Box padding="400">
+                        <BlockStack gap="300">
+                          <InlineStack align="space-between" blockAlign="center" wrap={false}>
+                            <Text variant="headingSm" as="h3">Automatic Mapping (AI)</Text>
+                            <Button
+                              icon={WandIcon}
+                              onClick={handleAiMapClick}
+                              loading={isAiMappingLoading}
+                              disabled={!processedPreviewData || isAiMappingLoading}
+                            >
+                              Map with AI
+                            </Button>
+                          </InlineStack>
+                          <Text variant="bodyMd" tone="subdued">
+                             Let AI analyze your data sample and suggest mappings for standard fields and metafields. Review suggestions carefully.
+                          </Text>
+                          {aiMappingError && (
+                             <InlineError message={aiMappingError} fieldID="aiMappingError" />
+                          )}
+                        </BlockStack>
+                     </Box>
+                  </Card>
+
                   {/* === Standard Fields === */}
                   <Card roundedAbove="sm">
                     <BlockStack gap="400">

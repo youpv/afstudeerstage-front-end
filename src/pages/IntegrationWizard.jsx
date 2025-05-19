@@ -15,6 +15,7 @@ import WizardStepBasics from '../components/IntegrationWizard/WizardStepBasics'
 import WizardStepConnectionFtp from '../components/IntegrationWizard/WizardStepConnectionFtp'
 import WizardStepMapping from '../components/IntegrationWizard/WizardStepMapping'
 import WizardStepSchedule from '../components/IntegrationWizard/WizardStepSchedule'
+import WizardStepPreview from '../components/IntegrationWizard/WizardStepPreview'
 
 // API function to test FTP connection
 const testFtpConnection = async (credentials) => {
@@ -70,24 +71,26 @@ const getDataFromPath = (obj, path) => {
           return null; // Array doesn't exist or is too short
         }
       } else if (Array.isArray(result)) {
-        // If we encounter an array, get the first item automatically
-        result = result.length > 0 ? result[0] : null;
-        
-        // If we still have path parts to process, get the next property
-        if (i < parts.length) {
-          result = result?.[part];
+        // MODIFIED: We no longer auto-extract first item from arrays during path traversal
+        // Instead, keep arrays intact and continue navigating properties if needed
+        if (i < parts.length - 1) {
+          // If we're in the middle of a path, handle array of objects by keeping
+          // the array structure but navigating the next property for each item
+          // Map each array item to get the next property
+          result = result.map(item => item?.[part]);
+          // Skip the next part since we just processed it
+          i++;
         }
+        // For the last part of the path, or if no more parts to process,
+        // just keep the array as is (no need to assign to itself)
       } else {
         // Regular object property
         result = result[part];
       }
     }
 
-    // If result is an array at the end, return the first item
-    if (Array.isArray(result)) {
-      return result.length > 0 ? result[0] : null;
-    }
-
+    // MODIFIED: We now preserve arrays at the end of a path
+    // This allows us to navigate through products in the preview
     return result;
   } catch (/* eslint-disable-next-line no-unused-vars */
     _
@@ -146,6 +149,7 @@ function IntegrationWizard({ onFinish, initialData = null }) {
   const [processedPreviewData, setProcessedPreviewData] = useState(null) // Data after applying dataPath
   const [mappingOptions, setMappingOptions] = useState([])
   const [dataPathError, setDataPathError] = useState('')
+  const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0); // NEW: State for preview navigation
 
   // --- Shared State ---
   const [name, setName] = useState(initialData?.name ?? '')
@@ -251,7 +255,8 @@ function IntegrationWizard({ onFinish, initialData = null }) {
   const [frequency, setFrequency] = useState(initialData?.syncFrequency ?? '24')
   const frequencyId = 'frequency'
 
-  const steps = ['Basics', 'Connection', 'Mapping', 'Schedule']
+  // UPDATED: Add 'Preview' step
+  const steps = ['Basics', 'Connection', 'Mapping', 'Preview', 'Schedule']
 
   // --- React Query Mutations ---
 
@@ -314,9 +319,14 @@ function IntegrationWizard({ onFinish, initialData = null }) {
 
           let objectForMapping = null;
           if (extractedData !== null && typeof extractedData === 'object' && !Array.isArray(extractedData)) {
+              // Single object case
               objectForMapping = extractedData;
           } else if (Array.isArray(extractedData) && extractedData.length > 0 && typeof extractedData[0] === 'object') {
+              // Array of objects case - use first item for mapping but keep array for preview
               objectForMapping = extractedData[0];
+              
+              // Also reset currentPreviewIndex when the data changes (better UX)
+              setCurrentPreviewIndex(0);
           } else if (extractedData !== null) { // Don't error if path yields null/undefined, just no options
               setDataPathError('Data at the specified path is not suitable for mapping (must be an object or array of objects).');
               setTitleKey(''); // Reset required field
@@ -425,6 +435,138 @@ function IntegrationWizard({ onFinish, initialData = null }) {
       }
   };
 
+  // NEW: Function to apply mappings to a single source product object
+  const generatePreviewForProduct = (sourceProduct) => {
+    if (!sourceProduct || typeof sourceProduct !== 'object') {
+      return { error: 'Invalid source product data for preview.' };
+    }
+
+    // Define where each field constant should be placed in the preview object
+    // KEYED BY THE CONSTANT *NAME* (string) e.g., 'FIELD_VENDOR'
+    const FIELD_PLACEMENT_MAP = {
+      'FIELD_TITLE': { target: 'root', key: 'title' },
+      'FIELD_DESCRIPTION_HTML': { target: 'root', key: 'bodyHtml' },
+      'FIELD_VENDOR': { target: 'root', key: 'vendor' },
+      'FIELD_PRODUCT_TYPE': { target: 'root', key: 'productType' },
+      'FIELD_TAGS': { target: 'root', key: 'tags' },
+      'FIELD_STATUS': { target: 'root', key: 'status' },
+      'FIELD_HANDLE': { target: 'root', key: 'handle' },
+      'FIELD_PUBLISHED_AT': { target: 'root', key: 'publishedAt' },
+      'FIELD_REQUIRES_SELLING_PLAN': { target: 'root', key: 'requiresSellingPlan' },
+      'FIELD_TEMPLATE_SUFFIX': { target: 'root', key: 'templateSuffix' },
+
+      'FIELD_SEO_TITLE': { target: 'seo', key: 'title' },
+      'FIELD_SEO_DESCRIPTION': { target: 'seo', key: 'description' },
+
+      'FIELD_SKU': { target: 'inventoryItem', key: 'sku' },
+      'FIELD_BARCODE': { target: 'inventoryItem', key: 'barcode' },
+      'FIELD_PRICE': { target: 'inventoryItem', key: 'price' },
+      'FIELD_COMPARE_AT_PRICE': { target: 'inventoryItem', key: 'compareAtPrice' },
+      'FIELD_WEIGHT': { target: 'inventoryItem', key: 'weight' },
+      'FIELD_WEIGHT_UNIT': { target: 'inventoryItem', key: 'weightUnit' },
+      'FIELD_INVENTORY_POLICY': { target: 'inventoryItem', key: 'inventoryPolicy' },
+      'FIELD_INVENTORY_QUANTITY': { target: 'inventoryItem', key: 'inventoryQuantity' },
+      'FIELD_INVENTORY_MANAGEMENT': { target: 'inventoryItem', key: 'inventoryManagement' },
+      'FIELD_TAXABLE': { target: 'inventoryItem', key: 'taxable' },
+      'FIELD_TAX_CODE': { target: 'inventoryItem', key: 'taxCode' },
+      'FIELD_HARMONIZED_SYSTEM_CODE': { target: 'inventoryItem', key: 'harmonizedSystemCode' },
+      'FIELD_REQUIRES_SHIPPING': { target: 'inventoryItem', key: 'requiresShipping' },
+      'FIELD_COST': { target: 'inventoryItem', key: 'cost' },
+    };
+
+    // Start with an empty object for the preview, initializing nested structures
+    const previewData = {
+      seo: {},
+      inventoryItem: {},
+    };
+
+    // 1. Handle the required title field separately first
+    if (titleKey && sourceProduct[titleKey] !== undefined) {
+      const titlePlacement = FIELD_PLACEMENT_MAP['FIELD_TITLE'];
+      if (titlePlacement && titlePlacement.target === 'root') {
+        previewData[titlePlacement.key] = sourceProduct[titleKey];
+      }
+    } else {
+      previewData.title = undefined; // Ensure title key exists even if unmapped
+    }
+
+    // 2. Handle mapped optional standard fields using the placement map
+    activeOptionalFields.forEach(fieldConstant => {
+      const mappedKey = optionalFieldKeys[fieldConstant]; // Get the source key mapped to this standard field
+      // Check if the field is mapped AND the key exists in the source product
+      if (mappedKey && sourceProduct[mappedKey] !== undefined) {
+        const value = sourceProduct[mappedKey]; // Get the actual value from the source
+        const placement = FIELD_PLACEMENT_MAP[fieldConstant]; // Find where to put it
+
+        if (placement) {
+            if (placement.target === 'root') {
+                // Assign directly to the root of previewData using the simple key name
+                previewData[placement.key] = value;
+            } else {
+                // Ensure the nested object (e.g., seo, inventoryItem) exists
+                // It's already initialized, so this check is slightly redundant but safe
+                if (!previewData[placement.target]) {
+                    previewData[placement.target] = {};
+                }
+                // Assign to the nested object using the simple key name
+                previewData[placement.target][placement.key] = value;
+            }
+        } else {
+             // Should not happen if FIELD_PLACEMENT_MAP is complete
+             console.warn(`Field constant ${fieldConstant} not found in placement map.`);
+        }
+      }
+    });
+
+    // Clean up empty sub-objects if no fields were mapped into them
+    if (Object.keys(previewData.seo).length === 0) delete previewData.seo;
+    if (Object.keys(previewData.inventoryItem).length === 0) delete previewData.inventoryItem;
+
+    // 3. Simulate metafield mapping (Remains the same)
+    const previewMetafields = [];
+    metafieldMappings.forEach((mapping) => {
+        if (!mapping.sourceKey || !sourceProduct[mapping.sourceKey]) return; // Skip if source key isn't mapped or doesn't exist
+
+        const sourceValue = sourceProduct[mapping.sourceKey];
+
+        if (mapping.mappingType === 'single') {
+            if (mapping.metafieldNamespace && mapping.metafieldKey && mapping.metafieldType) {
+                previewMetafields.push({
+                    namespace: mapping.metafieldNamespace,
+                    key: mapping.metafieldKey,
+                    type: mapping.metafieldType,
+                    value: sourceValue, // Direct mapping for single
+                });
+            }
+        } else if (mapping.mappingType === 'dynamic_from_array') {
+            if (
+                Array.isArray(sourceValue) &&
+                mapping.metafieldNamespace &&
+                mapping.arrayKeySource &&
+                mapping.arrayValueSource &&
+                mapping.metafieldType // Base type
+            ) {
+                sourceValue.forEach((item) => {
+                    if (item && typeof item === 'object' && item[mapping.arrayKeySource] && item[mapping.arrayValueSource] !== undefined) {
+                        previewMetafields.push({
+                            namespace: mapping.metafieldNamespace,
+                            key: item[mapping.arrayKeySource], // Key comes from the array item
+                            type: mapping.metafieldType, // Use the base type for preview
+                            value: item[mapping.arrayValueSource], // Value comes from the array item
+                        });
+                    }
+                });
+            }
+        }
+    });
+
+    if (previewMetafields.length > 0) {
+        previewData.metafields = previewMetafields; // Add metafields to the preview
+    }
+
+    return previewData;
+  };
+
   // Effect to re-process data when dataPath changes
   useEffect(() => {
     // Only process if we actually have raw data downloaded
@@ -433,6 +575,45 @@ function IntegrationWizard({ onFinish, initialData = null }) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataPath]); // Rerun processing when dataPath changes, relies on remoteData being stable
+
+  // NEW: Memoize the mapped preview data for the current index
+  const mappedPreviewData = useMemo(() => {
+    if (!processedPreviewData) return { info: 'No data processed yet.' };
+
+    let sourceForCurrentIndex = null;
+
+    if (Array.isArray(processedPreviewData)) {
+      if (processedPreviewData.length > currentPreviewIndex) {
+        sourceForCurrentIndex = processedPreviewData[currentPreviewIndex];
+      } else {
+        return { error: 'Preview index out of bounds.' };
+      }
+    } else if (typeof processedPreviewData === 'object' && currentPreviewIndex === 0) {
+      // Handle non-array object case (only index 0 is valid)
+      sourceForCurrentIndex = processedPreviewData;
+    } else if (currentPreviewIndex !== 0) {
+        // If it's not an array, only index 0 is possible
+        return { error: 'Preview navigation not possible for non-array data.' };
+    } else {
+        // Handle cases where processedPreviewData is neither array nor object (e.g., string, null)
+        return { info: 'Data is not an object or array, cannot generate mapped preview.' };
+    }
+
+    if (sourceForCurrentIndex) {
+      return generatePreviewForProduct(sourceForCurrentIndex);
+    } else {
+      return { info: 'No source data found for the current preview index.' };
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [processedPreviewData, currentPreviewIndex, titleKey, optionalFieldKeys, activeOptionalFields, metafieldMappings]);
+
+  // Calculate product count for display - RESTORED
+  const productCount = useMemo(() => {
+    if (Array.isArray(processedPreviewData)) {
+      return processedPreviewData.length;
+    }
+    return null; // Not an array, so no count to display
+  }, [processedPreviewData]);
 
   // Trigger the test connection
   const handleTestConnectionClick = () => {
@@ -450,9 +631,11 @@ function IntegrationWizard({ onFinish, initialData = null }) {
     if (step === 0 && !name) return true;
     // Enable next on step 1 if connection test succeeded OR if download succeeded (meaning test implicitly succeeded)
     if (step === 1 && connectionType === 'ftp' && (!ftpHost || !ftpUser || !ftpPassword || !filePath || (!testConnectionMutation.isSuccess && !downloadMutation.isSuccess))) return true;
-    // Only check for the required title mapping
+    // Only check for the required title mapping on mapping step
     if (step === 2 && (!titleKey || mappingOptions.length === 0)) return true;
-    if (step === 3 && !frequency) return true;
+    // Preview step (step 3) is always enabled if we got past mapping
+    // Schedule step (step 4) check
+    if (step === 4 && !frequency) return true; // Adjusted index
     return false;
   })();
 
@@ -554,7 +737,7 @@ function IntegrationWizard({ onFinish, initialData = null }) {
         existingIntegrations.push(integration); // Add new
       }
       localStorage.setItem('integrations', JSON.stringify(existingIntegrations));
-      console.log('Integration saved to LocalStorage:', integration);
+      
     } catch (error) {
       console.error("Error saving integration to LocalStorage:", error);
       // Optionally show an error to the user
@@ -572,7 +755,17 @@ function IntegrationWizard({ onFinish, initialData = null }) {
     let fullString = '';
     try {
       if (typeof processedPreviewData === 'object') {
-        fullString = JSON.stringify(processedPreviewData, null, 2);
+        // Format the data for preview display
+        let dataToShowInConnectionStepPreview = processedPreviewData;
+        
+        // *** FIX: If it's an array, ONLY use the first item for THIS preview ***
+        if (Array.isArray(processedPreviewData) && processedPreviewData.length > 0) {
+          dataToShowInConnectionStepPreview = processedPreviewData[0]; 
+        }
+
+        // Stringify only the selected data (single object or first item of array)
+        fullString = JSON.stringify(dataToShowInConnectionStepPreview, null, 2);
+
       } else {
         fullString = String(processedPreviewData); // Handle non-object data (e.g., strings, numbers)
       }
@@ -586,6 +779,14 @@ function IntegrationWizard({ onFinish, initialData = null }) {
       return fullString;
     }
   }, [processedPreviewData]);
+  
+  // Calculate product count for display - REMOVED
+  // const productCount = useMemo(() => {
+  //   if (Array.isArray(processedPreviewData)) {
+  //     return processedPreviewData.length;
+  //   }
+  //   return null; // Not an array, so no count to display
+  // }, [processedPreviewData]);
 
   // Determine loading state for the button
   const isConnectionStepLoading = testConnectionMutation.isPending || downloadMutation.isPending;
@@ -630,10 +831,10 @@ function IntegrationWizard({ onFinish, initialData = null }) {
               handleTestConnectionClick={handleTestConnectionClick}
               testConnectionMutation={testConnectionMutation}
               downloadMutation={downloadMutation}
-              processedPreviewData={processedPreviewData}
               truncatedPreviewString={truncatedPreviewString}
               dataPathError={dataPathError}
               remoteData={remoteData}
+              productCount={productCount}
             />
           );
         }
@@ -671,13 +872,26 @@ function IntegrationWizard({ onFinish, initialData = null }) {
             // Other necessary props
             mappingOptions={mappingOptions}
             remoteData={remoteData}
-            processedPreviewData={processedPreviewData}
+            // FIXED: Always use the first item for mapping if processedPreviewData is an array
+            processedPreviewData={Array.isArray(processedPreviewData) && processedPreviewData.length > 0 
+              ? processedPreviewData[0] 
+              : processedPreviewData}
           />
         );
       case 3:
         return (
-          <WizardStepSchedule
+          <WizardStepPreview
             stepTitle={steps[3]}
+            processedPreviewData={processedPreviewData}
+            mappedPreviewData={mappedPreviewData}
+            currentPreviewIndex={currentPreviewIndex}
+            setCurrentPreviewIndex={setCurrentPreviewIndex}
+          />
+        );
+      case 4:
+        return (
+          <WizardStepSchedule
+            stepTitle={steps[4]}
             frequency={frequency}
             setFrequency={setFrequency}
             frequencyId={frequencyId}

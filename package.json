@@ -12,11 +12,12 @@
   "dependencies": {
     "@shopify/polaris": "^13.9.5",
     "@shopify/polaris-icons": "^9.3.1",
+    "@tanstack/react-query": "latest",
     "basic-ftp": "^5.0.5",
+    "openai": "^4.96.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.4.1",
-    "@tanstack/react-query": "latest"
+    "react-router-dom": "^7.4.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
