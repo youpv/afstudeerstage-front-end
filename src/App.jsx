@@ -11,13 +11,27 @@ function App() {
   const navigate = useNavigate()
   const { addIntegration, integrations, deleteIntegration } = useIntegrations()
 
-  const handleWizardFinish = (integration) => {
-    addIntegration(integration)
-    navigate('/') // go back to dashboard
+  const handleWizardFinish = async (integration) => {
+    try {
+      await addIntegration(integration)
+      navigate('/') // go back to dashboard
+    } catch (error) {
+      console.error('Error adding integration:', error)
+      // Still navigate away even if there's an error to prevent user from being stuck
+      navigate('/')
+    }
   }
 
   const handleCreate = () => navigate('/integrations/new')
-  const handleDelete = (id) => deleteIntegration(id)
+  
+  const handleDelete = async (id) => {
+    try {
+      await deleteIntegration(id)
+    } catch (error) {
+      console.error('Error deleting integration:', error)
+    }
+  }
+  
   const handleEdit = (id) => navigate(`/integrations/${id}/edit`)
 
   return (

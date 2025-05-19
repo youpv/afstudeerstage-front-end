@@ -19,6 +19,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useIntegrations } from '../context/IntegrationContext'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import WizardStepPreview from '../components/IntegrationWizard/WizardStepPreview'
+import { syncIntegration, deleteIntegrationConfig } from '../services/api-client.js'
 
 // --- Helper Functions ---
 // Helper function to extract data from a nested path
@@ -263,38 +264,19 @@ const downloadFtpFile = async ({ credentials, filePath }) => {
 
 // --- API Functions ---
 const syncIntegrationApi = async (integrationId) => {
-  // REMOVED the API fetch attempt. Directly simulate the sync.
   try {
-    console.log(`Simulating sync for integration: ${integrationId}`); // Log simulation start
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate delay
-    return { success: true, syncedAt: new Date().toISOString() }; // Return success
+    return await syncIntegration(integrationId);
   } catch (error) {
-    console.error('Sync simulation error:', error); // Log if the simulation itself fails (unlikely here)
+    console.error(`Error syncing integration ${integrationId}:`, error);
     throw error;
   }
 };
 
 const deleteIntegrationApi = async (integrationId) => {
-  
   try {
-    // First try the API endpoint
-    try {
-      const response = await fetch(`/api/integrations/${integrationId}`, {
-        method: 'DELETE',
-      });
-      if (response.ok) {
-        return await response.json();
-      }
-    } catch {
-      // Intentional fallback for development/testing if API fails
-      console.warn(`API call for delete failed for ${integrationId}, using fallback.`);
-    }
-    
-    // Fallback for development/testing
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { success: true };
+    return await deleteIntegrationConfig(integrationId);
   } catch (error) {
-    console.error('Delete error:', error);
+    console.error(`Error deleting integration ${integrationId}:`, error);
     throw error;
   }
 };

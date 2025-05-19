@@ -17,15 +17,16 @@ import { PlusIcon, EditIcon, DeleteIcon, RefreshIcon } from '@shopify/polaris-ic
 import { useCallback, useState, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useIntegrations } from '../context/IntegrationContext.jsx'
+import { syncIntegration } from '../services/api-client.js'
 
-// --- API Simulation (Should match IntegrationDetail) ---
+// --- API Integration ---
 const syncIntegrationApi = async (integrationId) => {
-  console.log(`Simulating sync for integration: ${integrationId}`);
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  if (Math.random() < 0.1) {
-    throw new Error('Simulated sync failed: Random error');
+  try {
+    return await syncIntegration(integrationId);
+  } catch (error) {
+    console.error(`Error syncing integration ${integrationId}:`, error);
+    throw error;
   }
-  return { success: true, syncedAt: new Date().toISOString() };
 };
 
 // Dummy handler for Learn More action
@@ -44,7 +45,12 @@ function Dashboard({
 }) {
   // Fallback to context if integrations prop is undefined
   const { integrations: ctxIntegrations } = useIntegrations()
-  const integrations = integrationsProp ?? ctxIntegrations
+  
+  // Make sure integrations is always an array
+  const rawIntegrations = integrationsProp ?? ctxIntegrations
+  const integrations = Array.isArray(rawIntegrations) ? rawIntegrations : []
+  
+  console.log('Dashboard integrations:', integrations);
 
   const [selectedItems, setSelectedItems] = useState([])
   const [sortValue, setSortValue] = useState('name')

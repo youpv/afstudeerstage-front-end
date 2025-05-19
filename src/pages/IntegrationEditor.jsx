@@ -14,9 +14,15 @@ function IntegrationEditor() {
     return <NotFound />
   }
 
-  const handleFinish = (updated) => {
-    editIntegration(updated)
-    navigate('/')
+  const handleFinish = async (updated) => {
+    try {
+      await editIntegration(updated)
+      navigate('/')
+    } catch (error) {
+      console.error('Error updating integration:', error)
+      // Still navigate away even if there's an error
+      navigate('/')
+    }
   }
 
   return <IntegrationWizard initialData={integration} onFinish={handleFinish} />

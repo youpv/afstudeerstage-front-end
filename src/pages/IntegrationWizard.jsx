@@ -7,6 +7,8 @@ import {
   Box,
 } from '@shopify/polaris'
 import { useMutation } from '@tanstack/react-query'
+// We don't need these imports anymore since we're using the context
+// import { saveIntegrationConfig, updateIntegrationConfig } from '../services/api-client.js'
 
 // Import sub-components
 import WizardStepsIndicator from '../components/IntegrationWizard/WizardStepsIndicator'
@@ -744,7 +746,8 @@ function IntegrationWizard({ onFinish, initialData = null }) {
     }
     // --- End LocalStorage Saving ---
 
-    onFinish(integration)
+    // Let onFinish handle the API call instead of doing it here
+    onFinish(integration);
   }
 
   // Calculate truncated preview string using useMemo for efficiency
