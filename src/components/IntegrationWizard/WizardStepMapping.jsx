@@ -10,13 +10,10 @@ import {
   ActionList,
   Tooltip,
   InlineGrid,
-  Badge,
-  Scrollable,
   Box,
   Icon,
   Card,
   TextField,
-  Spinner,
   InlineError,
 } from '@shopify/polaris'
 import {
@@ -51,8 +48,20 @@ const METAFIELD_TYPES = [
   { label: 'URL', value: 'url' },
   { label: 'Date', value: 'date' },
   { label: 'Date & Time', value: 'date_time' },
+  { label: 'Color', value: 'color' },
+  { label: 'Weight', value: 'weight' },
+  { label: 'Volume', value: 'volume' },
+  { label: 'Dimension', value: 'dimension' },
+  { label: 'Rating', value: 'rating' },
   { label: 'List: Single line text', value: 'list.single_line_text_field' },
-  // Add more list types if needed (e.g., list.number_integer)
+  { label: 'List: Multi line text', value: 'list.multi_line_text_field' },
+  { label: 'List: Integer', value: 'list.number_integer' },
+  { label: 'List: Decimal', value: 'list.number_decimal' },
+  { label: 'List: Boolean', value: 'list.boolean' },
+  { label: 'List: URL', value: 'list.url' },
+  { label: 'List: Date', value: 'list.date' },
+  { label: 'List: Date & Time', value: 'list.date_time' },
+  { label: 'List: JSON String', value: 'list.json_string' },
 ];
 
 // --- Helper to get keys from the first object in an array ---
@@ -411,16 +420,16 @@ function WizardStepMapping({
         fieldConstantsString
     );
 
-    console.log("Using System Prompt:", systemPrompt); // Debugging
+    
 
     try {
       const suggested = await suggestMappings(processedPreviewData, systemPrompt);
 
-      console.log("AI Suggestions Received:", suggested); // Debugging
+      
       
       // Get list of available source keys for validation
       const availableSourceKeys = mappingOptions.map(opt => opt.value);
-      console.log("Available source keys:", availableSourceKeys); // Debugging
+      
 
       // --- Apply Suggestions (Basic Implementation - Overwrites existing) ---
       // Validate response structure (add more robust validation as needed)
@@ -433,7 +442,7 @@ function WizardStepMapping({
         // Check if the suggested key exists in mappingOptions
         if (availableSourceKeys.includes(suggested.titleKey)) {
           setTitleKey(suggested.titleKey);
-          console.log(`Successfully mapped title to '${suggested.titleKey}'`);
+          
         } else {
           console.warn(`AI suggested titleKey '${suggested.titleKey}' not found in available options.`);
         }
@@ -448,30 +457,30 @@ function WizardStepMapping({
       
       if (suggested.optionalFieldKeys && typeof suggested.optionalFieldKeys === 'object') {
         // Log all the optionalFieldKeys suggested by AI
-        console.log("AI suggested optionalFieldKeys:", suggested.optionalFieldKeys);
+        
         
         // Log field constants for debugging
-        console.log("Field constants:", fieldConstants);
+        
         
         Object.entries(suggested.optionalFieldKeys).forEach(([fieldConstantValue, sourceKey]) => {
           // fieldConstantValue should be the constant name like 'FIELD_SKU'
           // sourceKey should be the key from the source data like 'sku'
 
           // For debugging, log each field mapping attempt
-          console.log(`Attempting to map '${fieldConstantValue}' to source key '${sourceKey}'`);
+          
           // Check if the key suggested by AI ('fieldConstantValue') is a valid key in our fieldConstants prop
           const isValidConstantKey = Object.prototype.hasOwnProperty.call(fieldConstants, fieldConstantValue);
           const isValidSourceKey = typeof sourceKey === 'string' && availableSourceKeys.includes(sourceKey);
 
-          console.log(`Is valid constant key ('${fieldConstantValue}')?: ${isValidConstantKey}`);
-          console.log(`Is valid source key ('${sourceKey}') in options?: ${isValidSourceKey}`);
+          
+          
 
           // Check if the constant key is valid AND the source key exists in the data
           if (isValidConstantKey && isValidSourceKey) {
             // Use fieldConstantValue directly as it IS the correct internal key
             newOptionalKeys[fieldConstantValue] = sourceKey;
             newActiveFields.push(fieldConstantValue);
-            console.log(`Successfully mapped '${fieldConstantValue}' to '${sourceKey}'`);
+            
           } else {
             console.warn(`AI suggested invalid or non-existent mapping for optional field '${fieldConstantValue}' to source key '${sourceKey}'. Constant valid: ${isValidConstantKey}, Source valid: ${isValidSourceKey}`);
           }
@@ -479,8 +488,8 @@ function WizardStepMapping({
       }
       
       // Log what we're actually setting for optional fields
-      console.log("Setting optional field keys:", newOptionalKeys);
-      console.log("Setting active optional fields:", newActiveFields);
+      
+      
       
       setOptionalFieldKeys(prev => ({ ...prev, ...newOptionalKeys })); // Merge suggestions with existing
       setActiveOptionalFields(prev => [...new Set([...prev, ...newActiveFields])]); // Add newly activated fields
@@ -533,11 +542,11 @@ function WizardStepMapping({
               }
             }
             
-            console.log(`Valid metafield mapping:`, mf);
+            
             return true;
           });
         
-        console.log(`Setting ${validMetafieldMappings.length} valid metafield mappings`);
+        
         setMetafieldMappings(validMetafieldMappings);
       } else {
          setMetafieldMappings([]); // Clear if AI didn't provide valid array
